@@ -1,0 +1,29 @@
+{
+    "tapis_config": {
+        "retry": 3,
+        "username": "username",
+        "password": "password",
+        "base_url": "https://tapis-dev-uh.its.hawaii.edu",
+        "tenant_id": "uh-dev",
+        "db": "",
+        "collection": ""
+    },
+    "prop_translations": {
+        "SKN": "skn",
+        "Station.Name": "name",
+        "OBSERVER": "observer",
+        "Network": "network",
+        "Island": "island",
+        "ELEV.m.": "elevation_m",
+        "LAT": "lat",
+        "LON": "lng",
+        "NCEI.id": "ncei_id",
+        "NWS.id": "nws_id",
+        "NESDIS.id": "nesdis_id",
+        "SCAN.id": "scan_id",
+        "SMART_NODE_RF.id": "smart_node_rf_id"
+    },
+    "id_field": "skn",
+    "station_group": "hawaii_climate_primary",
+    "file": ""
+}
