@@ -4,8 +4,10 @@ import json
 from sys import stderr, argv
 from os.path import join
 
-# import sys
-# sys.path.append("..")
+import sys
+import os
+
+sys.path.insert(1, os.path.realpath(os.path.pardir))
 
 from ingestion_handler import TapisHandler
 from date_parser import DateParser

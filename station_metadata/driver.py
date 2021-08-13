@@ -3,6 +3,12 @@ import re
 import json
 from sys import stderr, argv
 from os.path import join
+
+import sys
+import os
+
+sys.path.insert(1, os.path.realpath(os.path.pardir))
+
 from ingestion_handler import TapisHandler
 from date_parser import DateParser
 
@@ -53,6 +59,7 @@ else:
 file = config["file"]
 tapis_config = config["tapis_config"]
 prop_translations = config["prop_translations"]
+
 #in case have multiple station setswith separate id universes
 id_field = config["id_field"]
 station_group = config["station_group"]
