@@ -1,12 +1,8 @@
 {
     "tapis_config": {
-        "retry": 3,
-        "username": "username",
-        "password": "password",
-        "base_url": "https://tapis-dev-uh.its.hawaii.edu",
-        "tenant_id": "uh-dev",
-        "db": "",
-        "collection": ""
+        "tenant_url": "https://agaveauth.its.hawaii.edu/meta/v2/data",
+        "token": "token",
+        "retry": 3
     },
     "data": [{
         "start_date": null,
