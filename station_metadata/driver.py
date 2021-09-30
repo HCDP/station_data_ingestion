@@ -9,7 +9,7 @@ import os
 
 sys.path.insert(1, os.path.realpath(os.path.pardir))
 
-from ingestion_handler import TapisHandler
+from ingestion_handler import V2Handler
 from date_parser import DateParser
 
 ######
@@ -64,38 +64,38 @@ prop_translations = config["prop_translations"]
 id_field = config["id_field"]
 station_group = config["station_group"]
 
-with TapisHandler(tapis_config) as tapis_handler:
-    with open(file, "r") as fd:
-        reader = csv.reader(fd)
-        header = None
-        for row in reader:
-            if header is None:
-                header = row
-                for i in range(len(header)):
-                    prop = header[i]
-                    trans = prop_translations.get(prop)
-                    if trans is not None:
-                        header[i] = trans
-            else:
-                for i in range(len(row)):
-                    values = {}
-                    data = {
-                        "id_field": id_field,
-                        "station_group": station_group,
-                        "station_id": None,
-                        "value": {}
-                    }
-                    prop = header[i]
-                    value = row[i]
-                    if prop == id_field:
-                        data["station_id"] = value
-                    data["value"][prop] = value
-
-                doc = {
-                    "name": "hcdp_station_metadata",
-                    "value": data
+tapis_handler = V2Handler(tapis_config)
+with open(file, "r") as fd:
+    reader = csv.reader(fd)
+    header = None
+    for row in reader:
+        if header is None:
+            header = row
+            for i in range(len(header)):
+                prop = header[i]
+                trans = prop_translations.get(prop)
+                if trans is not None:
+                    header[i] = trans
+        else:
+            for i in range(len(row)):
+                values = {}
+                data = {
+                    "id_field": id_field,
+                    "station_group": station_group,
+                    "station_id": None,
+                    "value": {}
                 }
-                
-                tapis_handler.submit(doc, ["station_group", "station_id"])
+                prop = header[i]
+                value = row[i]
+                if prop == id_field:
+                    data["station_id"] = value
+                data["value"][prop] = value
+
+            doc = {
+                "name": "hcdp_station_metadata",
+                "value": data
+            }
+            
+            tapis_handler.create_or_replace(doc, ["station_group", "station_id"])
 print("Complete!")
                         

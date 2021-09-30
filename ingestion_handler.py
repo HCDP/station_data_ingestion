@@ -1,5 +1,6 @@
 from tapipy.tapis import Tapis
-import random
+import requests
+import json
 from time import sleep
 import requests
 import json
