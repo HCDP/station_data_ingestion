@@ -9,7 +9,7 @@ import os
 
 sys.path.insert(1, os.path.realpath(os.path.pardir))
 
-from ingestion_handler import TapisHandler
+from ingestion_handler import V2Handler
 from date_parser import DateParser
 
 ######
@@ -56,91 +56,89 @@ else:
     
 data = config["data"]
 tapis_config = config["tapis_config"]
-with TapisHandler(tapis_config) as tapis_handler:
-    for data_item in data:
-        files = data_item["files"]
+tapis_handler = V2Handler(tapis_config)
+for data_item in data:
+    files = data_item["files"]
 
-        #optional props
-        #inclusive at both ends
-        start_date = data_item.get("start_date")
-        end_date = data_item.get("end_date")
-        data_col_start = data_item.get("data_col_start") or 1
-        id_col = data_item.get("id_col") or 0
-        nodata = data_item.get("nodata") or "NA"
+    #optional props
+    #inclusive at both ends
+    start_date = data_item.get("start_date")
+    end_date = data_item.get("end_date")
+    data_col_start = data_item.get("data_col_start") or 1
+    id_col = data_item.get("id_col") or 0
+    nodata = data_item.get("nodata") or "NA"
+    additional_props = data_item.get("additional_properties") or {}
+    additional_key_props = data_item.get("additional_key_properties") or []
 
-        #required props
-        datatype = data_item["datatype"]
-        #if ever have variation without period (e.g. specific datetimes) need to update date handling anyway
-        period = data_item["period"]
-        # fill = data_item["fill"]
-        # tier = data_item["tier"]
-        
-        additional_props = data_item["additional_properties"]
-        additional_key_props = data_item["additional_key_properties"]
+    #required props
+    datatype = data_item["datatype"]
+    period = data_item["period"]
+    
+    
 
-        #for updates
-        #add additional key props to base set of key props
-        key_fields = ["datatype", "period", "date", "station_id"] + additional_key_props
+    #for updates
+    #add additional key props to base set of key props
+    key_fields = ["datatype", "period", "date", "station_id"] + additional_key_props
 
-        for file in files:
-            with open(file, "r") as fd:
-                reader = csv.reader(fd)
-                dates = None
-                range_start = data_col_start
-                range_end = None
-                for row in reader:
-                    if dates is None:
-                        range_end = len(row)
-                        dates = [None] * len(row)
-                        #transform dates
-                        for i in range(range_start, len(row)):
-                            date_handler = DateParser(row[i], period)
-                            date = date_handler.getDatetime()
-                            date_s = date_handler.getISOString()
-                            #skip if before start date
-                            if start_date is not None and date < start_date:
-                                #move start index
-                                range_start += 1
-                                continue
-                            #break if past end date
-                            if end_date is not None and date > end_date:
-                                #set end col
-                                range_end = i
-                                break
-                            dates[i] = date_s
-                        #cut date array to range
-                        dates = dates[range_start:range_end]
-                        print(dates[0])
-                        print(dates[len(dates) - 1])
-                    else:
-                        station_id = row[id_col]
-                        #cut to range matching dates
-                        values = row[range_start:range_end]
-                        for i in range(len(values)):
-                            value = values[i]
-                            #if value is nodata skip
-                            if value != nodata:
-                                #transform to numeric
-                                value_f = float(value)
-                                date = dates[i]
+    for file in files:
+        with open(file, "r") as fd:
+            reader = csv.reader(fd)
+            dates = None
+            range_start = data_col_start
+            range_end = None
+            for row in reader:
+                if dates is None:
+                    range_end = len(row)
+                    dates = [None] * len(row)
+                    #transform dates
+                    for i in range(range_start, len(row)):
+                        date_handler = DateParser(row[i], period)
+                        date = date_handler.getDatetime()
+                        date_s = date_handler.getISOString()
+                        #skip if before start date
+                        if start_date is not None and date < start_date:
+                            #move start index
+                            range_start += 1
+                            continue
+                        #break if past end date
+                        if end_date is not None and date > end_date:
+                            #set end col
+                            range_end = i
+                            break
+                        dates[i] = date_s
+                    #cut date array to range
+                    dates = dates[range_start:range_end]
+                    print(dates[0])
+                    print(dates[len(dates) - 1])
+                else:
+                    station_id = row[id_col]
+                    #cut to range matching dates
+                    values = row[range_start:range_end]
+                    for i in range(len(values)):
+                        value = values[i]
+                        #if value is nodata skip
+                        if value != nodata:
+                            #transform to numeric
+                            value_f = float(value)
+                            date = dates[i]
 
-                                data = {
-                                    "datatype": datatype,
-                                    "period": period,
-                                    "station_id": station_id,
-                                    "date": date,
-                                    "value": value_f
-                                }
+                            data = {
+                                "datatype": datatype,
+                                "period": period,
+                                "station_id": station_id,
+                                "date": date,
+                                "value": value_f
+                            }
 
-                                #set up non-required props
-                                for prop in additional_props:
-                                    data[prop] = data_item[prop]
+                            #set up non-required props
+                            for prop_key, prop_value in additional_props.items():
+                                data[prop_key] = prop_value
 
-                                doc = {
-                                    "name": "hcdp_station_value",
-                                    "value": data
-                                }
-                                
-                                tapis_handler.submit(doc, key_fields)
+                            doc = {
+                                "name": "hcdp_station_value",
+                                "value": data
+                            }
+                            
+                            tapis_handler.create_or_replace(doc, key_fields)
 print("Complete!")
                                 

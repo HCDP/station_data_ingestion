@@ -1,12 +1,8 @@
 {
     "tapis_config": {
         "retry": 3,
-        "username": "username",
-        "password": "password",
-        "base_url": "https://tapis-dev-uh.its.hawaii.edu",
-        "tenant_id": "uh-dev",
-        "db": "",
-        "collection": ""
+        "tenant_url": "",
+        "token": ""
     },
     "data": [{
         "start_date": null,
@@ -16,10 +12,11 @@
         "nodata": "NA",
         "datatype": "rainfall",
         "period": "day",
-        "fill": "partial",
-        "tier": "archival",
-        "production": "new",
-        "additional_properties": ["fill", "tier", "production"],
+        "additional_properties": {
+            "fill": "partial",
+            "tier": "archival",
+            "production": "new"
+        },
         "additional_key_properties": ["fill", "tier", "production"],
         "files": ["Partial_Filled_Daily_RF_mm_2020_12_31_RF.csv"]
     }]
