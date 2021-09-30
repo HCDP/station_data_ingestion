@@ -56,11 +56,7 @@ else:
     
 data = config["data"]
 tapis_config = config["tapis_config"]
-<<<<<<< HEAD
 tapis_handler = V2Handler(tapis_config)
-=======
-tapis_handler = TapisHandler(tapis_config)
->>>>>>> 0ddfaf0dec6c3d4cee0c3a910d0c090ff7202500
 for data_item in data:
     files = data_item["files"]
 
@@ -71,7 +67,6 @@ for data_item in data:
     data_col_start = data_item.get("data_col_start") or 1
     id_col = data_item.get("id_col") or 0
     nodata = data_item.get("nodata") or "NA"
-<<<<<<< HEAD
     additional_props = data_item.get("additional_properties") or {}
     additional_key_props = data_item.get("additional_key_properties") or []
 
@@ -80,18 +75,6 @@ for data_item in data:
     period = data_item["period"]
     
     
-=======
-
-    #required props
-    datatype = data_item["datatype"]
-    #if ever have variation without period (e.g. specific datetimes) need to update date handling anyway
-    period = data_item["period"]
-    # fill = data_item["fill"]
-    # tier = data_item["tier"]
-    
-    additional_props = data_item["additional_properties"]
-    additional_key_props = data_item["additional_key_properties"]
->>>>>>> 0ddfaf0dec6c3d4cee0c3a910d0c090ff7202500
 
     #for updates
     #add additional key props to base set of key props
@@ -148,23 +131,14 @@ for data_item in data:
                             }
 
                             #set up non-required props
-<<<<<<< HEAD
                             for prop_key, prop_value in additional_props.items():
                                 data[prop_key] = prop_value
-=======
-                            for prop in additional_props:
-                                data[prop] = data_item[prop]
->>>>>>> 0ddfaf0dec6c3d4cee0c3a910d0c090ff7202500
 
                             doc = {
                                 "name": "hcdp_station_value",
                                 "value": data
                             }
                             
-<<<<<<< HEAD
                             tapis_handler.create_or_replace(doc, key_fields)
-=======
-                            tapis_handler.submit(doc, key_fields)
->>>>>>> 0ddfaf0dec6c3d4cee0c3a910d0c090ff7202500
 print("Complete!")
                                 
