@@ -3,6 +3,7 @@ import re
 import json
 from sys import stderr, argv
 from os.path import join
+from dateutil import parser
 
 import sys
 import os
@@ -24,7 +25,12 @@ def print_help():
     """)
 
 def invalid():
-    print("Invalid command line args.\n")
+    print("Invalid command line args. Must contain a config file or object.\n")
+    print_help()
+    exit(1)
+
+def invalid_flag(flag):
+    print("Unrecognized flag %s.\n" % flag)
     print_help()
     exit(1)
 
@@ -34,21 +40,57 @@ def help():
 
 config = None
 
-#load config
-if len(argv) < 2:
-    invalid()
-if argv[1] == "-h" or argv[1] == "--help":
-    help()
-if argv[1] == "-f":
-    if len(argv) < 3:
-        invalid()
-    
-    config_file = argv[2]
-    with open(config_file) as f:
-        config = json.load(f)
-else:
-    config = json.loads(argv[1])
+#inclusive at both ends
+start_date = None
+end_date = None
+#inclusive at one end [)
+start_file = None
+end_file = None
+exec_id = None
 
+#ah python, why can't you just be normal
+i = 1
+#use while loop because for loops with range iterator can't increment value in loop
+while i < len(argv):
+    arg = argv[i]
+    if arg[0] == "-":
+        #no switch statements either...
+        if arg == "-f" or arg == "--file":
+            i += 1
+            config_file = argv[i]
+            with open(config_file) as f:
+                config = json.load(f)
+        elif arg == "-sd" or arg == "--start_date":
+            i += 1
+            start_date = argv[i]
+        elif arg == "-ed" or arg == "--end_date":
+            i += 1
+            end_date = argv[i]
+        elif arg == "-sf" or arg == "--start_file":
+            i += 1
+            try:
+                start_file = int(argv[i])
+            except:
+                invalid()
+        elif arg == "-ef" or arg == "--end_file":
+            i += 1
+            try:
+                end_file = int(argv[i])
+            except:
+                invalid()
+        elif arg == "-id":
+            i += 1
+            exec_id = argv[i]
+        elif arg == "-h" or arg == "--help":
+            help()
+        else:
+            invalid_flag(arg)
+    else:
+        config = json.loads(arg)
+    i += 1
+
+if config is None:
+    invalid()
 
 ##################################
 ##################################
@@ -61,9 +103,6 @@ for data_item in data:
     files = data_item["files"]
 
     #optional props
-    #inclusive at both ends
-    start_date = data_item.get("start_date")
-    end_date = data_item.get("end_date")
     data_col_start = data_item.get("data_col_start") or 1
     id_col = data_item.get("id_col") or 0
     nodata = data_item.get("nodata") or "NA"
@@ -80,7 +119,18 @@ for data_item in data:
     #add additional key props to base set of key props
     key_fields = ["datatype", "period", "date", "station_id"] + additional_key_props
 
-    for file in files:
+    if start_file is None:
+        start_file = 0
+    if end_file is None:
+        end_file = files.length
+    #convert dates to datetimes
+    if start_date is not None:
+        start_date = parser.parse(start_date)
+    if end_date is not None:
+        end_date = parser.parse(end_date)
+
+    for i in range(start_file, end_file):
+        file = files[i]
         with open(file, "r") as fd:
             reader = csv.reader(fd)
             dates = None
@@ -140,5 +190,7 @@ for data_item in data:
                             }
                             
                             tapis_handler.create_or_replace(doc, key_fields)
-print("Complete!")
-                                
+if exec_id is None:
+    print("Complete!")
+else:
+    print("Complete! id: %s" % exec_id)
