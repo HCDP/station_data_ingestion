@@ -99,6 +99,18 @@ if config is None:
 data = config["data"]
 tapis_config = config["tapis_config"]
 tapis_handler = V2Handler(tapis_config)
+
+num_files = 0
+for data_item in data:
+    num_files += len(data_item["files"])
+
+if start_file is None:
+    start_file = 0
+if end_file is None:
+    end_file = num_files
+
+current_file = 0
+
 for data_item in data:
     files = data_item["files"]
 
@@ -112,84 +124,77 @@ for data_item in data:
     #required props
     datatype = data_item["datatype"]
     period = data_item["period"]
-    
-    
 
     #for updates
     #add additional key props to base set of key props
-    key_fields = ["datatype", "period", "date", "station_id"] + additional_key_props
+    key_fields = ["datatype", "period", "date", "fill", "station_id"] + additional_key_props
 
-    if start_file is None:
-        start_file = 0
-    if end_file is None:
-        end_file = files.length
+    
     #convert dates to datetimes
     if start_date is not None:
         start_date = parser.parse(start_date)
     if end_date is not None:
         end_date = parser.parse(end_date)
 
-    for i in range(start_file, end_file):
-        file = files[i]
-        with open(file, "r") as fd:
-            reader = csv.reader(fd)
-            dates = None
-            range_start = data_col_start
-            range_end = None
-            for row in reader:
-                if dates is None:
-                    range_end = len(row)
-                    dates = [None] * len(row)
-                    #transform dates
-                    for i in range(range_start, len(row)):
-                        date_handler = DateParser(row[i], period)
-                        date = date_handler.getDatetime()
-                        date_s = date_handler.getISOString()
-                        #skip if before start date
-                        if start_date is not None and date < start_date:
-                            #move start index
-                            range_start += 1
-                            continue
-                        #break if past end date
-                        if end_date is not None and date > end_date:
-                            #set end col
-                            range_end = i
-                            break
-                        dates[i] = date_s
-                    #cut date array to range
-                    dates = dates[range_start:range_end]
-                    print(dates[0])
-                    print(dates[len(dates) - 1])
-                else:
-                    station_id = row[id_col]
-                    #cut to range matching dates
-                    values = row[range_start:range_end]
-                    for i in range(len(values)):
-                        value = values[i]
-                        #if value is nodata skip
-                        if value != nodata:
-                            #transform to numeric
-                            value_f = float(value)
-                            date = dates[i]
+    for i in range(len(files)):
+        if current_file >= end_file:
+            break
+        elif current_file >= start_file:
+            file = files[i]
+            with open(file, "r") as fd:
+                reader = csv.reader(fd)
+                dates = None
+                range_start = data_col_start
+                range_end = None
+                for row in reader:
+                    if dates is None:
+                        range_end = len(row)
+                        dates = [None] * len(row)
+                        #transform dates
+                        for i in range(range_start, len(row)):
+                            date_handler = DateParser(row[i], period)
+                            date = date_handler.getDatetime()
+                            date_s = date_handler.getISOString()
+                            #skip if before start date
+                            if start_date is not None and date < start_date:
+                                continue
+                            #break if past end date
+                            if end_date is not None and date > end_date:
+                                break
+                            dates[i] = date_s
+                        #cut date array to range
+                        dates = dates[range_start:range_end]
+                    else:
+                        station_id = row[id_col]
+                        #cut to range matching dates
+                        values = row[range_start:range_end]
+                        for i in range(len(values)):
+                            value = values[i]
+                            #if value is nodata skip
+                            if value != nodata:
+                                #transform to numeric
+                                value_f = float(value)
+                                date = dates[i]
 
-                            data = {
-                                "datatype": datatype,
-                                "period": period,
-                                "station_id": station_id,
-                                "date": date,
-                                "value": value_f
-                            }
+                                data = {
+                                    "datatype": datatype,
+                                    "period": period,
+                                    "station_id": station_id,
+                                    "date": date,
+                                    "value": value_f
+                                }
 
-                            #set up non-required props
-                            for prop_key, prop_value in additional_props.items():
-                                data[prop_key] = prop_value
+                                #set up non-required props
+                                for prop_key, prop_value in additional_props.items():
+                                    data[prop_key] = prop_value
 
-                            doc = {
-                                "name": "hcdp_station_value",
-                                "value": data
-                            }
-                            
-                            tapis_handler.create_or_replace(doc, key_fields)
+                                doc = {
+                                    "name": "hcdp_station_value",
+                                    "value": data
+                                }
+                                
+                                tapis_handler.create_or_replace(doc, key_fields)
+        current_file += 1
 if exec_id is None:
     print("Complete!")
 else:

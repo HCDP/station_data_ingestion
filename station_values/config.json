@@ -5,10 +5,8 @@
         "retry": 3
     },
     "data": [{
-        "start_date": null,
-        "end_date": null,
-        "data_col_start": 14,
-        "id_col": 1,
+        "data_col_start": 13,
+        "id_col": 0,
         "nodata": "NA",
         "datatype": "rainfall",
         "period": "day",
