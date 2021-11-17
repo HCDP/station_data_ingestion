@@ -1,14 +1,8 @@
 {
     "tapis_config": {
-<<<<<<< HEAD
-        "retry": 3,
-        "tenant_url": "",
-        "token": ""
-=======
         "tenant_url": "https://agaveauth.its.hawaii.edu/meta/v2/data",
         "token": "token",
         "retry": 3
->>>>>>> 0ddfaf0dec6c3d4cee0c3a910d0c090ff7202500
     },
     "data": [{
         "start_date": null,
