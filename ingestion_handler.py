@@ -142,12 +142,24 @@ class V2Handler:
             uuid = uuids[0]
             self.replace(data, uuid)
         elif multiple_replace_mode == MultipleMatchMode.ALL:
+            #replace first and delete rest
+            first = True
             for uuid in uuids:
-                self.replace(data, uuid)
+                if first:
+                    self.replace(data, uuid)
+                    first = False
+                else:
+                    self.delete(uuid)
         elif multiple_replace_mode == MultipleMatchMode.ALL_WARN:
             print("Warning: found multiple entries matching the specified key data. Replacing all matches...")
+            #replace first and delete rest
+            first = True
             for uuid in uuids:
-                self.replace(data, uuid)
+                if first:
+                    self.replace(data, uuid)
+                    first = False
+                else:
+                    self.delete(uuid)
         elif multiple_replace_mode == MultipleMatchMode.SKIP_WARN:
             print("Warning: found multiple entries matching the specified key data. Skipping...")
         elif multiple_replace_mode == MultipleMatchMode.ERROR:

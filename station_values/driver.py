@@ -124,6 +124,7 @@ for data_item in data:
     #required props
     datatype = data_item["datatype"]
     period = data_item["period"]
+    fill = data_item["fill"]
 
     #for updates
     #add additional key props to base set of key props
@@ -178,6 +179,7 @@ for data_item in data:
 
                                 data = {
                                     "datatype": datatype,
+                                    "fill": fill,
                                     "period": period,
                                     "station_id": station_id,
                                     "date": date,
