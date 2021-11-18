@@ -37,40 +37,39 @@ class V2Handler:
     def __req_with_retry(self, method, url, params, retry, delay = 0):
         #pause for specified amount of time
         sleep(delay)
-        res = None
-        err = None
         
         def retry_set_err(e):
-            nonlocal res
-            nonlocal err
-            #set error
-            err = e
             #get backoff
             backoff = self.__get_backoff(delay)
             #decrease retry number
             next_retry = retry - 1
-            #if have retries remaining try again and set res to returned reponse, otherwise just return error response
+            #if have retries remaining try again return recursive result, otherwise just return error response
             if next_retry >= 0:
-                res = self.__req_with_retry(method, url, params, next_retry, backoff)
-
+                return self.__req_with_retry(method, url, params, next_retry, backoff)
+            else:
+                return {
+                    "res": None,
+                    "error": e
+                }
+        res = None
         try:
             #may raise ConnectionError, res will be None if last failure is a connection error
             res = method(url, **params)
         #all request errors inherited from requests.exceptions.RequestException
         except requests.exceptions.RequestException as e:
             #retry request and set error
-            retry_set_err(e)
+            return retry_set_err(e)
         try:
             #will raise an HTTPError if request returned an error response
             res.raise_for_status()
         except requests.exceptions.HTTPError as e:
             #retry request and set error
-            retry_set_err(e)
+            return retry_set_err(e)
             
         #return response
         return {
             "response": res,
-            "error": err
+            "error": None
         }
             
 
@@ -89,12 +88,17 @@ class V2Handler:
         status_group = status // 100
         return status_group == 2
 
-    def query_data(self, data):
+    def query_data(self, data, limit = None, offset = None):
         query = json.dumps(data)
 
         params = {
             "q": query
         }
+
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
 
         request_params = {
             "params": params,
@@ -112,10 +116,10 @@ class V2Handler:
         data = res.json()["result"]
         return data
 
-    def query_uuids(self, data):
+    def query_uuids(self, data, limit = None, offset = None):
         uuids = []
         #get result of query
-        data = self.query_data(data)
+        data = self.query_data(data, limit = limit, offset = offset)
         #list uuids from matching records
         for record in data:
             uuids.append(record["uuid"])
