@@ -1,4 +1,3 @@
-from tapipy.tapis import Tapis
 import requests
 import json
 from time import sleep
@@ -42,6 +41,8 @@ class V2Handler:
         err = None
         
         def retry_set_err(e):
+            nonlocal res
+            nonlocal err
             #set error
             err = e
             #get backoff
