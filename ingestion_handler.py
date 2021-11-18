@@ -6,6 +6,8 @@ import requests
 import json
 import random
 from enum import Enum
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class MultipleMatchMode(Enum):
