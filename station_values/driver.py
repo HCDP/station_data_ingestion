@@ -1,7 +1,7 @@
 import csv
 import re
 import json
-from sys import stderr, argv
+from sys import stderr, argv, exit
 from os.path import join
 from dateutil import parser
 
@@ -12,104 +12,75 @@ sys.path.insert(1, os.path.realpath(os.path.pardir))
 
 from ingestion_handler import V2Handler
 from date_parser import DateParser
+from os.path import isfile
+
+
+def write_state(state_data, state_file):
+    if state_file is not None:
+        with open(state_file, "w") as f:
+            json.dump(state_data, f)
+
+def get_state(state_file):
+    #init state
+    #note row and column indices are to data rows/columns (does not include header row or metadata columns, cols should be offset from data col start and row should start at row 1)
+    state_data = {
+        "file": 0,
+        "row": 0,
+        "col": 0,
+        "complete": False
+    }
+    #if state file not provided return default, won't be written
+    if state_file is not None:
+        #if file does not exist return default init state
+        if isfile(state_file):
+            #otherwise set to saved state
+            with open(state_file) as f:
+                state_data = json.load(f)
+
+    return state_data
+
+def get_config(config_file):
+    config = None
+    with open(config_file) as f:
+        config = json.load(f)
+    return config
+
 
 ######
 #args#
 ######
 
-def print_help():
+if len(argv) < 2:
     print("""
+        Invalid command line args. Must contain a config file.
+
         usage:
-        station_ingestor.py (<config> | -f <config_file>)
-        -h, --help: show this message
-    """)
-
-def invalid():
-    print("Invalid command line args. Must contain a config file or object.\n")
-    print_help()
+        station_ingestor.py <config_file> [<state_file>]
+    """, file = stderr)
     exit(1)
 
-def invalid_flag(flag):
-    print("Unrecognized flag %s.\n" % flag)
-    print_help()
-    exit(1)
+config_file = argv[1]
+state_file = None
 
-def help():
-    print_help()
-    exit(0)
+if len(argv) > 2:
+    state_file = argv[2]
 
-config = None
+config = get_config(config_file)
+state_data = get_state(state_file)
 
-#inclusive at both ends
-start_date = None
-end_date = None
-#inclusive at one end [)
-start_file = None
-end_file = None
-exec_id = None
-
-#ah python, why can't you just be normal
-i = 1
-#use while loop because for loops with range iterator can't increment value in loop
-while i < len(argv):
-    arg = argv[i]
-    if arg[0] == "-":
-        #no switch statements either...
-        if arg == "-f" or arg == "--file":
-            i += 1
-            config_file = argv[i]
-            with open(config_file) as f:
-                config = json.load(f)
-        elif arg == "-sd" or arg == "--start_date":
-            i += 1
-            start_date = argv[i]
-        elif arg == "-ed" or arg == "--end_date":
-            i += 1
-            end_date = argv[i]
-        elif arg == "-sf" or arg == "--start_file":
-            i += 1
-            try:
-                start_file = int(argv[i])
-            except:
-                invalid()
-        elif arg == "-ef" or arg == "--end_file":
-            i += 1
-            try:
-                end_file = int(argv[i])
-            except:
-                invalid()
-        elif arg == "-id":
-            i += 1
-            exec_id = argv[i]
-        elif arg == "-h" or arg == "--help":
-            help()
-        else:
-            invalid_flag(arg)
-    else:
-        config = json.loads(arg)
-    i += 1
-
-if config is None:
-    invalid()
 
 ##################################
 ##################################
 
-    
+#deconstruct config
 data = config["data"]
 tapis_config = config["tapis_config"]
+
 tapis_handler = V2Handler(tapis_config)
 
-num_files = 0
-for data_item in data:
-    num_files += len(data_item["files"])
+file_num = 0
 
-if start_file is None:
-    start_file = 0
-if end_file is None:
-    end_file = num_files
-
-current_file = 0
+#need to move cols and rows
 
 for data_item in data:
     files = data_item["files"]
@@ -120,6 +91,9 @@ for data_item in data:
     nodata = data_item.get("nodata") or "NA"
     additional_props = data_item.get("additional_properties") or {}
     additional_key_props = data_item.get("additional_key_properties") or []
+    #inclusive at both ends
+    start_date = config.get("start_date")
+    end_date = config.get("end_date")
 
     #required props
     datatype = data_item["datatype"]
@@ -138,9 +112,10 @@ for data_item in data:
         end_date = parser.parse(end_date)
 
     for i in range(len(files)):
-        if current_file >= end_file:
-            break
-        elif current_file >= start_file:
+
+        #if file listed in state data is after this one skip
+        if file_num >= state_data["file"]:
+
             file = files[i]
             with open(file, "r") as fd:
                 reader = csv.reader(fd)
@@ -196,8 +171,11 @@ for data_item in data:
                                 }
                                 
                                 tapis_handler.create_or_replace(doc, key_fields)
-        current_file += 1
-if exec_id is None:
-    print("Complete!")
-else:
-    print("Complete! id: %s" % exec_id)
+            #finished file, move state file
+            state_data["file"] += 1
+        #iterate file num
+        file_num += 1
+
+
+state_data["complete"] = True
+write_state(state_data, state_file)

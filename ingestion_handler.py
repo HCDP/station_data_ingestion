@@ -88,6 +88,23 @@ class V2Handler:
         status_group = status // 100
         return status_group == 2
 
+    def retrieve_by_uuid(self, uuid):
+        url = "%s/%s" % (self.__url, uuid)
+        params = {
+            "headers": self.__headers,
+            "verify": False
+        }
+        res_data = self.__req_with_retry(requests.get, url, params, self.__retry)
+        #if errored out raise last error
+        if res_data["error"] is not None:
+            raise res_data["error"]
+        
+        res = res_data["response"]
+        data = res.json()["result"]
+        return data
+
+
+
     def query_data(self, data, limit = None, offset = None):
         query = json.dumps(data)
 
