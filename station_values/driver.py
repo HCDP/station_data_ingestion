@@ -140,7 +140,7 @@ for data_item in data:
                 range_start = data_col_start
                 range_end = None
                 #current data row
-                row = 0
+                row_num = 0
                 for row in reader:
                     #check if header row
                     if dates is None:
@@ -167,7 +167,7 @@ for data_item in data:
                     #data rows
                     else:
                         #if before the row indicated in the state object, skip
-                        if row >= state_data["row"]:
+                        if row_num >= state_data["row"]:
                             station_id = row[id_col]
                             #cut values to data range
                             values = row[range_start:range_end]
@@ -205,7 +205,7 @@ for data_item in data:
                             #move state row to next row
                             state_data["row"] += 1
                         #increment current row
-                        row += 1
+                        row_num += 1
             #finished file, move state file and reset row and col
             state_data["file"] += 1
             state_data["row"] = 0
