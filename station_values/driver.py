@@ -179,7 +179,7 @@ for data_item in data:
                                     if value != nodata:
                                         #transform to numeric
                                         value_f = float(value)
-                                        date = dates[i]
+                                        date = dates[col]
 
                                         data = {
                                             "datatype": datatype,
