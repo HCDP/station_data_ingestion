@@ -74,7 +74,7 @@ state_data = get_state(state_file)
 ##################################
 
 def uncaught_exception_handler(exctype, value, traceback):
-    print(exctype, value, traceback, file = stderr)
+    traceback.print_exc()
     write_state(state_data, state_file)
     exit(1)
 
