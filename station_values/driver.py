@@ -2,9 +2,10 @@ import csv
 import re
 import json
 from sys import stderr, argv, exit
+import sys
 from os.path import join
 from dateutil import parser
-
+import signal
 import sys
 import os
 
@@ -72,6 +73,24 @@ state_data = get_state(state_file)
 ##################################
 ##################################
 
+def uncaught_exception_handler(exctype, value, traceback):
+    print(exctype, value, traceback, file = stderr)
+    write_state(state_data, state_file)
+    exit(1)
+
+sys.excepthook = uncaught_exception_handler
+
+def sig_handler(sig, frame):
+    print("Process interrupted or terminated")
+    write_state(state_data, state_file)
+    exit(2)
+
+signal.signal(signal.SIGINT, sig_handler)
+signal.signal(signal.SIGTERM, sig_handler)
+
+##################################
+##################################
+
 #deconstruct config
 data = config["data"]
 tapis_config = config["tapis_config"]
@@ -79,8 +98,6 @@ tapis_config = config["tapis_config"]
 tapis_handler = V2Handler(tapis_config)
 
 file_num = 0
-
-#need to move cols and rows
 
 for data_item in data:
     files = data_item["files"]
@@ -122,57 +139,77 @@ for data_item in data:
                 dates = None
                 range_start = data_col_start
                 range_end = None
+                #current data row
+                row = 0
                 for row in reader:
+                    #check if header row
                     if dates is None:
                         range_end = len(row)
-                        dates = [None] * len(row)
+                        dates = []
                         #transform dates
-                        for i in range(range_start, len(row)):
-                            date_handler = DateParser(row[i], period)
-                            date = date_handler.getDatetime()
-                            date_s = date_handler.getISOString()
-                            #skip if before start date
-                            if start_date is not None and date < start_date:
-                                continue
-                            #break if past end date
-                            if end_date is not None and date > end_date:
-                                break
-                            dates[i] = date_s
-                        #cut date array to range
-                        dates = dates[range_start:range_end]
+                        for i in range(len(row)):
+                            #if before start index, skip
+                            if i >= range_start:
+                                #create date parser from current date and period
+                                date_handler = DateParser(row[i], period)
+                                date = date_handler.getDatetime()
+                                date_s = date_handler.getISOString()
+                                #if before start date move start index
+                                if start_date is not None and date < start_date:
+                                    range_start = i
+                                #break if past end date and set range end
+                                elif end_date is not None and date > end_date:
+                                    range_end = i
+                                    break
+                                #otherwise in range, add date to dates
+                                else:
+                                    dates.append(date_s)
+                    #data rows
                     else:
-                        station_id = row[id_col]
-                        #cut to range matching dates
-                        values = row[range_start:range_end]
-                        for i in range(len(values)):
-                            value = values[i]
-                            #if value is nodata skip
-                            if value != nodata:
-                                #transform to numeric
-                                value_f = float(value)
-                                date = dates[i]
+                        #if before the row indicated in the state object, skip
+                        if row >= state_data["row"]:
+                            station_id = row[id_col]
+                            #cut values to data range
+                            values = row[range_start:range_end]
+                            for col in range(len(values)):
+                                #if before the column indicated in the state object, skip
+                                if col >= state_data["col"]:
+                                    value = values[col]
+                                    #if value is nodata skip
+                                    if value != nodata:
+                                        #transform to numeric
+                                        value_f = float(value)
+                                        date = dates[i]
 
-                                data = {
-                                    "datatype": datatype,
-                                    "fill": fill,
-                                    "period": period,
-                                    "station_id": station_id,
-                                    "date": date,
-                                    "value": value_f
-                                }
+                                        data = {
+                                            "datatype": datatype,
+                                            "fill": fill,
+                                            "period": period,
+                                            "station_id": station_id,
+                                            "date": date,
+                                            "value": value_f
+                                        }
 
-                                #set up non-required props
-                                for prop_key, prop_value in additional_props.items():
-                                    data[prop_key] = prop_value
+                                        #set up non-required props
+                                        for prop_key, prop_value in additional_props.items():
+                                            data[prop_key] = prop_value
 
-                                doc = {
-                                    "name": "hcdp_station_value",
-                                    "value": data
-                                }
-                                
-                                tapis_handler.create_or_replace(doc, key_fields)
-            #finished file, move state file
+                                        doc = {
+                                            "name": "hcdp_station_value",
+                                            "value": data
+                                        }
+                                        
+                                        tapis_handler.create_or_replace(doc, key_fields)
+                                    #increment state col
+                                    state_data["col"] += 1
+                            #move state row to next row
+                            state_data["row"] += 1
+                        #increment current row
+                        row += 1
+            #finished file, move state file and reset row and col
             state_data["file"] += 1
+            state_data["row"] = 0
+            state_data["col"] = 0
         #iterate file num
         file_num += 1
 
