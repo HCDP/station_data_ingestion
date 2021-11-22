@@ -8,6 +8,7 @@ from dateutil import parser
 import signal
 import sys
 import os
+from traceback import print_exception
 
 sys.path.insert(1, os.path.realpath(os.path.pardir))
 
@@ -73,12 +74,18 @@ state_data = get_state(state_file)
 ##################################
 ##################################
 
-def uncaught_exception_handler(exctype, value, traceback):
-    traceback.print_exc()
+def uncaught_exception_handler(exctype, value, tb):
     write_state(state_data, state_file)
+    print_exception(exctype, value, tb)
+    exit(1)
+
+def unraisable_exception_handler(unraisable):
+    write_state(state_data, state_file)
+    print_exception(unraisable.exc_type, unraisable.exc_value, unraisable.exc_traceback)
     exit(1)
 
 sys.excepthook = uncaught_exception_handler
+sys.unraisablehook = unraisable_exception_handler
 
 def sig_handler(sig, frame):
     print("Process interrupted or terminated")
@@ -216,3 +223,4 @@ for data_item in data:
 
 state_data["complete"] = True
 write_state(state_data, state_file)
+print("Complete!")
