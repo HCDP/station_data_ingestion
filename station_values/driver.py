@@ -1,9 +1,7 @@
 import csv
-import re
 import json
 from sys import stderr, argv, exit
 import sys
-from os.path import join
 from dateutil import parser
 import signal
 import sys
@@ -209,11 +207,12 @@ for data_item in data:
                                         tapis_handler.create_or_replace(doc, key_fields)
                                     #increment state col
                                     state_data["col"] += 1
-                            #move state row to next row
+                            #finished row, move state row, reset col
                             state_data["row"] += 1
+                            state_data["col"] = 0
                         #increment current row
                         row_num += 1
-            #finished file, move state file and reset row and col
+            #finished file, move state file, reset row and col
             state_data["file"] += 1
             state_data["row"] = 0
             state_data["col"] = 0
