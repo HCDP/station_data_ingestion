@@ -19,6 +19,7 @@
         "SCAN.id": "scan_id",
         "SMART_NODE_RF.id": "smart_node_rf_id"
     },
+    "nodata": "NA",
     "id_field": "skn",
     "station_group": "hawaii_climate_primary",
     "file": ""

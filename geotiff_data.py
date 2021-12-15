@@ -7,7 +7,7 @@ class RasterData:
         return index
 
     def __init__(self, file):
-        with TiffFile(file)as tif:
+        with TiffFile(file) as tif:
             metadata = tif.geotiff_metadata
             scale = metadata["ModelPixelScale"]
             scaleX = scale[0]
