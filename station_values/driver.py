@@ -110,7 +110,9 @@ for data_item in data:
     #optional props
     data_col_start = data_item.get("data_col_start") or 1
     id_col = data_item.get("id_col") or 0
-    nodata = data_item.get("nodata") or "NA"
+    nodata = data_item.get("nodata")
+    if nodata is None:
+        nodata = "NA"
     additional_props = data_item.get("additional_properties") or {}
     additional_key_props = data_item.get("additional_key_properties") or []
     #inclusive at both ends
