@@ -7,6 +7,8 @@ import signal
 import sys
 import os
 from traceback import print_exception
+import requests
+from os.path import isfile
 
 sys.path.insert(1, os.path.realpath(os.path.pardir))
 
@@ -55,7 +57,7 @@ if len(argv) < 2:
         Invalid command line args. Must contain a config file.
 
         usage:
-        station_ingestor.py <config_file> [<state_file>]
+        driver.py <config_file> [<state_file>]
     """, file = stderr)
     exit(1)
 
@@ -134,84 +136,95 @@ for data_item in data:
         end_date = parser.parse(end_date)
 
     for i in range(len(files)):
-
         #if file listed in state data is after this one skip
         if file_num >= state_data["file"]:
-
             file = files[i]
-            with open(file, "r") as fd:
-                reader = csv.reader(fd)
-                dates = None
-                range_start = data_col_start
-                range_end = None
-                #current data row
-                row_num = 0
-                for row in reader:
-                    #check if header row
-                    if dates is None:
-                        range_end = len(row)
-                        dates = []
-                        #transform dates
-                        for i in range(len(row)):
-                            #if before start index, skip
-                            if i >= range_start:
-                                #create date parser from current date and period
-                                date_handler = DateParser(row[i], period)
-                                date = date_handler.getDatetime()
-                                date_s = date_handler.getISOString()
-                                #if before start date move start index
-                                if start_date is not None and date < start_date:
-                                    range_start = i
-                                #break if past end date and set range end
-                                elif end_date is not None and date > end_date:
-                                    range_end = i
-                                    break
-                                #otherwise in range, add date to dates
-                                else:
-                                    dates.append(date_s)
-                    #data rows
-                    else:
-                        #if before the row indicated in the state object, skip
-                        if row_num >= state_data["row"]:
-                            station_id = row[id_col]
-                            #cut values to data range
-                            values = row[range_start:range_end]
-                            for col in range(len(values)):
-                                #if before the column indicated in the state object, skip
-                                if col >= state_data["col"]:
-                                    value = values[col]
-                                    #if value is nodata skip
-                                    if value != nodata:
-                                        #transform to numeric
-                                        value_f = float(value)
-                                        date = dates[col]
+            #check if file exists on local system
+            is_local_file = isfile(file)
+            fd = None
+            #if local file open and assign fd to file ref
+            if is_local_file:
+                fd = open(file, "r")
+            #otherwise try to get remote file
+            #if file does not exist or an error occurs the exception will be caught by the default exception handler and the program will terminate at the invalid file
+            else:
+                res = requests.get(file, stream = True)
+                res.raise_for_status()
+                #csv requires text not bytes, decode (assumes utf-8)
+                fd = (line.decode("utf-8") for line in res.iter_lines())
+            reader = csv.reader(fd)
+            dates = None
+            range_start = data_col_start
+            range_end = None
+            #current data row
+            row_num = 0
+            for row in reader:
+                #check if header row
+                if dates is None:
+                    range_end = len(row)
+                    dates = []
+                    #transform dates
+                    for i in range(len(row)):
+                        #if before start index, skip
+                        if i >= range_start:
+                            #create date parser from current date and period
+                            date_handler = DateParser(row[i], period)
+                            date = date_handler.getDatetime()
+                            date_s = date_handler.getISOString()
+                            #if before start date move start index
+                            if start_date is not None and date < start_date:
+                                range_start = i
+                            #break if past end date and set range end
+                            elif end_date is not None and date > end_date:
+                                range_end = i
+                                break
+                            #otherwise in range, add date to dates
+                            else:
+                                dates.append(date_s)
+                #data rows
+                else:
+                    #if before the row indicated in the state object, skip
+                    if row_num >= state_data["row"]:
+                        station_id = row[id_col]
+                        #cut values to data range
+                        values = row[range_start:range_end]
+                        for col in range(len(values)):
+                            #if before the column indicated in the state object, skip
+                            if col >= state_data["col"]:
+                                value = values[col]
+                                #if value is nodata skip
+                                if value != nodata:
+                                    #transform to numeric
+                                    value_f = float(value)
+                                    date = dates[col]
 
-                                        data = {
-                                            "datatype": datatype,
-                                            "fill": fill,
-                                            "period": period,
-                                            "station_id": station_id,
-                                            "date": date,
-                                            "value": value_f
-                                        }
+                                    data = {
+                                        "datatype": datatype,
+                                        "fill": fill,
+                                        "period": period,
+                                        "station_id": station_id,
+                                        "date": date,
+                                        "value": value_f
+                                    }
 
-                                        #set up non-required props
-                                        for prop_key, prop_value in additional_props.items():
-                                            data[prop_key] = prop_value
+                                    #set up non-required props
+                                    for prop_key, prop_value in additional_props.items():
+                                        data[prop_key] = prop_value
 
-                                        doc = {
-                                            "name": "hcdp_station_value",
-                                            "value": data
-                                        }
-                                        
-                                        tapis_handler.create_or_replace(doc, key_fields)
-                                    #increment state col
-                                    state_data["col"] += 1
-                            #finished row, move state row, reset col
-                            state_data["row"] += 1
-                            state_data["col"] = 0
-                        #increment current row
-                        row_num += 1
+                                    doc = {
+                                        "name": "hcdp_station_value",
+                                        "value": data
+                                    }
+                                    
+                                    tapis_handler.create_or_replace(doc, key_fields)
+                                #increment state col
+                                state_data["col"] += 1
+                        #finished row, move state row, reset col
+                        state_data["row"] += 1
+                        state_data["col"] = 0
+                    #increment current row
+                    row_num += 1
+            fd.close()
             #finished file, move state file, reset row and col
             state_data["file"] += 1
             state_data["row"] = 0
