@@ -35,8 +35,8 @@ The config file should be a JSON file with fields as follows:
 | data_col_start | true | The column the data starts on. Default value 1 |
 | id_col | true | The column the station ID is found in. Default value 0 |
 | nodata | true | The nodata value for the table. Default value "NA" |
-| start_date | true | The date to start processing at (inclusive). Dates before this will be ignored. |
-| end_date | true | The date to end processing at (inclusive). Dates after this will be ignored. |
+| start_date | true | An ISO-8601 formatted date string indicating the date to start processing at (inclusive). Dates before this will be ignored. |
+| end_date | true | An ISO-8601 formatted date string indicating the date to end processing at (inclusive). Dates after this will be ignored. |
 
 ### State File
 
