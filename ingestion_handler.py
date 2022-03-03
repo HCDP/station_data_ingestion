@@ -251,22 +251,7 @@ class V2Handler:
 
 
     def replace(self, data, uuid):
-        payload = json.dumps(data)
-
-        meta_url = "%s/%s" % (self.__url, uuid)
-
-        request_params = {
-            "data": payload,
-            "headers": self.__headers,
-            "verify": False
-        }
-
-        #wrap request in retry and get response
-        res_data = self.__req_with_retry(requests.post, meta_url, request_params, self.__retry)
-
-        #if errored out raise last error
-        if res_data["error"] is not None:
-            raise res_data["error"]
+        pass
 
 
 
