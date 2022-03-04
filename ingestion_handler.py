@@ -143,7 +143,7 @@ class V2Handler:
         return uuids
 
 
-    def create_or_replace(self, data, key_fields, multiple_replace_mode = MultipleMatchMode.ERROR):
+    def create_or_replace(self, data, key_fields, multiple_replace_mode = MultipleMatchMode.SKIP_WARN):
         key_data = {
             "name": data["name"],
         }
