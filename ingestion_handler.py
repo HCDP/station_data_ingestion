@@ -8,7 +8,6 @@ from enum import Enum
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-
 class MultipleMatchMode(Enum):
     ERROR = 0
     FIRST_MATCH = 1
@@ -143,7 +142,7 @@ class V2Handler:
         return uuids
 
 
-    def create_or_replace(self, data, key_fields, multiple_replace_mode = MultipleMatchMode.ERROR):
+    def create_check_duplicates(self, data, key_fields, replace = True, multiple_match_mode = MultipleMatchMode.ERROR):
         key_data = {
             "name": data["name"],
         }
@@ -156,38 +155,39 @@ class V2Handler:
         #create new record if none exists matching key fields
         if num_uuids == 0:
             self.create(data)
-        #replace data on match and handle multiple matches according to mode
-        elif num_uuids == 1 or multiple_replace_mode == MultipleMatchMode.FIRST_MATCH:
-            uuid = uuids[0]
-            self.replace(data, uuid)
-        elif multiple_replace_mode == MultipleMatchMode.FIRST_MATCH_WARN:
-            print("Warning: found multiple entries matching the specified key data. Replacing first match...")
-            uuid = uuids[0]
-            self.replace(data, uuid)
-        elif multiple_replace_mode == MultipleMatchMode.ALL:
-            #replace first and delete rest
-            first = True
-            for uuid in uuids:
-                if first:
-                    self.replace(data, uuid)
-                    first = False
-                else:
-                    self.delete(uuid)
-        elif multiple_replace_mode == MultipleMatchMode.ALL_WARN:
-            print("Warning: found multiple entries matching the specified key data. Replacing all matches...")
-            #replace first and delete rest
-            first = True
-            for uuid in uuids:
-                if first:
-                    self.replace(data, uuid)
-                    first = False
-                else:
-                    self.delete(uuid)
-        elif multiple_replace_mode == MultipleMatchMode.SKIP_WARN:
-            print("Warning: found multiple entries matching the specified key data. Skipping...")
-        elif multiple_replace_mode == MultipleMatchMode.ERROR:
-            raise RecordNotUniqueException("Multiple entries match the specified key data")
-        #skip mode does nothing
+        elif replace:
+            #replace data on match and handle multiple matches according to mode
+            if num_uuids == 1 or multiple_match_mode == MultipleMatchMode.FIRST_MATCH:
+                uuid = uuids[0]
+                self.replace(data, uuid)
+            elif multiple_match_mode == MultipleMatchMode.FIRST_MATCH_WARN:
+                print("Warning: found multiple entries matching the specified key data. Replacing first match...")
+                uuid = uuids[0]
+                self.replace(data, uuid)
+            elif multiple_match_mode == MultipleMatchMode.ALL:
+                #replace first and delete rest
+                first = True
+                for uuid in uuids:
+                    if first:
+                        self.replace(data, uuid)
+                        first = False
+                    else:
+                        self.delete(uuid)
+            elif multiple_match_mode == MultipleMatchMode.ALL_WARN:
+                print("Warning: found multiple entries matching the specified key data. Replacing all matches...")
+                #replace first and delete rest
+                first = True
+                for uuid in uuids:
+                    if first:
+                        self.replace(data, uuid)
+                        first = False
+                    else:
+                        self.delete(uuid)
+            elif multiple_match_mode == MultipleMatchMode.SKIP_WARN:
+                print("Warning: found multiple entries matching the specified key data. Skipping...")
+            elif multiple_match_mode == MultipleMatchMode.ERROR:
+                raise RecordNotUniqueException("Multiple entries match the specified key data")
+            #skip mode does nothing
 
 
     def delete_by_key(self, key_data, multiple_delete_mode = MultipleMatchMode.ALL):
