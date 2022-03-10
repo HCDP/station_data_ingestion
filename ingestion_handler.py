@@ -250,10 +250,9 @@ class V2Handler:
 
 
     def replace(self, data, uuid):
-        pass
         #replace function in tapis rarely works, just delete the old document and create the new one
-        # self.delete(uuid)
-        # self.create(data)
+        self.delete(uuid)
+        self.create(data)
 
 
 
