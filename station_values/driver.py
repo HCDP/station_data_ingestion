@@ -118,8 +118,8 @@ for data_item in data:
     additional_props = data_item.get("additional_properties") or {}
     additional_key_props = data_item.get("additional_key_properties") or []
     #inclusive at both ends
-    start_date = config.get("start_date")
-    end_date = config.get("end_date")
+    start_date = data_item.get("start_date")
+    end_date = data_item.get("end_date")
 
     #required props
     datatype = data_item["datatype"]
@@ -129,7 +129,6 @@ for data_item in data:
     #for updates
     #add additional key props to base set of key props
     key_fields = ["datatype", "period", "date", "fill", "station_id"] + additional_key_props
-
     
     #convert dates to datetimes
     if start_date is not None:
@@ -173,16 +172,13 @@ for data_item in data:
                             date_handler = DateParser(row[i], period)
                             date = date_handler.getDatetime()
                             date_s = date_handler.getISOString()
-                            #if before start date move start index
-                            if start_date is not None and date < start_date:
-                                range_start = i
-                            #break if past end date and set range end
-                            elif end_date is not None and date > end_date:
+                            if date >= start_date and date <= end_date:
+                                dates.append(date_s)
+                                if date == start_date:
+                                    range_start = i
+                            elif date > end_date:
                                 range_end = i
                                 break
-                            #otherwise in range, add date to dates
-                            else:
-                                dates.append(date_s)
                 #data rows
                 else:
                     #if before the row indicated in the state object, skip
@@ -198,6 +194,7 @@ for data_item in data:
                                 if value != nodata:
                                     #transform to numeric
                                     value_f = float(value)
+                                    
                                     date = dates[col]
 
                                     data = {

@@ -11,15 +11,17 @@
             "nodata": "NA",
             "datatype": "temperature",
             "period": "day",
-            "fill": "unfilled",
+            "fill": "raw",
+            "start_date": "2022-02-03",
+            "end_date": "2022-02-03",
             "additional_properties": {
-                "aggregation": "min"
+                "aggregation": "max"
             },
             "additional_key_properties": [
                 "aggregation"
             ],
             "files": [
-                "/mnt/lts/nfs_fs02/hcdp_group/kodamak_transfer/air_temp/daily/input/stations/aggregated/unfilled/daily_Tmin_2003_12.csv"
+                "temperature_max_day_statewide_raw_station_data_2022_02.csv"
             ]
         }
     ]
