@@ -135,6 +135,9 @@ for data_item in data:
         start_date = parser.parse(start_date)
     if end_date is not None:
         end_date = parser.parse(end_date)
+    #make sure end date is not before start date if both defined
+    if start_date is not None and end_date is not None and end_date < start_date:
+        raise Exception("Invalid date range")
 
     for i in range(len(files)):
         #if file listed in state data is after this one skip
@@ -172,11 +175,11 @@ for data_item in data:
                             date_handler = DateParser(row[i], period)
                             date = date_handler.getDatetime()
                             date_s = date_handler.getISOString()
-                            if date >= start_date and date <= end_date:
+                            if (start_date is None or date >= start_date) and (end_date is None or date <= end_date):
                                 dates.append(date_s)
                                 if date == start_date:
                                     range_start = i
-                            elif date > end_date:
+                            elif end_date is not None and date > end_date:
                                 range_end = i
                                 break
                 #data rows

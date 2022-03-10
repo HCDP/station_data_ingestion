@@ -143,7 +143,7 @@ class V2Handler:
         return uuids
 
 
-    def create_or_replace(self, data, key_fields, multiple_replace_mode = MultipleMatchMode.SKIP_WARN):
+    def create_or_replace(self, data, key_fields, multiple_replace_mode = MultipleMatchMode.ERROR):
         key_data = {
             "name": data["name"],
         }
@@ -151,7 +151,6 @@ class V2Handler:
         for field in key_fields:
             key = "value.%s" % field
             key_data[key] = data["value"][field]
-
         uuids = self.query_uuids(key_data)
         num_uuids = len(uuids)
         #create new record if none exists matching key fields
@@ -252,148 +251,9 @@ class V2Handler:
 
     def replace(self, data, uuid):
         pass
-
-
-
-# class V3Handler:
-
-#     def __init__(self, config):
-#         self.batch = []
-
-#         #setup retry
-#         self.__delay = 0
-#         self.__retry = config["retry"]
-
-#         self.__client = Tapis(base_url=config["base_url"], username=config["username"], password=config["password"], account_type="user", tenant_id=config["tenant_id"])
-#         self.__client.get_tokens()
-
-#         self.__db = config["db"]
-#         self.__collection = config["collection"]
-
-#         #########
-#         #testing#
-#         #########
-
-#         token = self.__client.access_token.access_token
-#         print(token)
-#         print(self.__client.meta.listDBNames())
-
-
-#     def submit(self, document, key_fields, suppress_non_unique):
-#         check_exists_config = {
-#             "unique_error_level": UniqueErrorLevel.ERROR,
-#             "skip_nonunique": False,
-#             "document": document,
-#             "key_fields": key_fields
-#         }
-#         #what exception classes does tapis functs throw?
-#         update_id = self.__exec_with_retry(self.__check_record_exists, (Exception), check_exists_config, self.__retry, 0)
-#         insert_config = {
-#             "document": document
-#         }
-#         if update_id:
-#             insert_config["update_id"] = update_id
-#             #put in batch?
-#             self.__exec_with_retry(self.__update_document, (Exception), insert_config, self.__retry, 0)
-#         else:
-#             self.__exec_with_retry(self.__create_document, (Exception), insert_config, self.__retry, 0)
-#         # #can you batch replace documents???
-#         # self.batch.append((data, replace_id))
-#         # #if batch replacement just check batch length and only submit if batch size ready
-#         # self.__submit(data, self.__retry, 0)
-
-
-
-#     def __exec_with_retry(self, exec, exception_classes, data, retry, delay, last_error = None):
-#         if retry < 0:
-#             raise Exception("Retry limit exceeded. Last error: %s" % str(last_error))
-        
-#         sleep(delay)
-
-#         try:
-#             return exec(data)
-#         #only retry if throws TapisException
-#         except exception_classes as e:
-#             backoff = 0
-#             #if first failure backoff of 0.25-0.5 seconds
-#             if delay == 0:
-#                 backoff = 0.25 + random.uniform(0, 0.25)
-#             #otherwise 2-3x current backoff
-#             else:
-#                 backoff = delay * 2 + random.uniform(0, delay)
-#             #retry with one less retry remaining and current backoff
-#             self.__submit(data, retry - 1, backoff, e)
-
-
-
-
-#     #batches? need to find out how that works
-#     def __create_document(self, data):
-#         document = data["document"]
-        
-#         #what is basic?
-#         #t.meta.createDocument(db='',collection=' ',basic=' ',body=' ')
-#         self.__client.meta.createDocument(db = self.__db, collection = self.__collection, basic = "???", body = document)
-
-
-#     def __update_document(self, data):
-#         document = data["document"]
-#         update_id = data["update_id"]
-        
-#         #from documentation... so how do I modify it???
-#         #t.meta.modifyDocument(db='',collection=' ',documentId=' ')
-#         self.__client.meta.modifyDocument
-
-
-#     def __check_record_exists(self, data):
-#         unique_error_level = data["unique_error_level"]
-#         skip_nonunique = data["skip_nonunique"]
-#         document = data["document"]
-#         key_fields = data["key_fields"]
-
-
-#         record_id = None
-#         query = {
-#             "name": document["name"]
-#         }
-#         for field in key_fields:
-#             #is value.field the right way to query a nested field in value?
-#             query_field = "value.%s"
-#             query[query_field] = document["value"][field]
-#         #this right?
-#         matches = self.__client.meta.listDocuments(db = self.__db, collection = self.__collection, filter = query)
-        
-#         handle_first = False
-
-#         #there should only be a single match since the fields should create a document key
-#         if len(matches) > 0:
-#             if len(matches > 1):
-#                 if unique_error_level == UniqueErrorLevel.ERROR:
-#                     raise RecordNotUniqueException("The record with the provided key fields is non-unique")
-#                 if unique_error_level == UniqueErrorLevel.WARNING:
-#                     print("Warning: The record with the provided key fields is non-unique")
-#                 handle_first = not skip_nonunique
-#             else:
-#                 handle_first = True
-
-#         if handle_first:
-#             record_id = matches[0]["_id"]
-#         return record_id
-        
-        
-
-#     #for batches submit remaining data
-#     def complete(self):
-#         pass
-
-#     def __enter__(self):
-#         return self
-
-#     def __exit__(self, type, value, traceback):
-#         self.complete()
-
-
-
+        #replace function in tapis rarely works, just delete the old document and create the new one
+        # self.delete(uuid)
+        # self.create(data)
 
 
 
