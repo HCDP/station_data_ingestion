@@ -22,5 +22,6 @@
     "nodata": "NA",
     "id_field": "skn",
     "station_group": "hawaii_climate_primary",
-    "file": ""
+    "file": "Hawaii_Master_Station_Meta.csv"
+    
 }
