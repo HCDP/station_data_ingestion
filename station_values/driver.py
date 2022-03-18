@@ -218,7 +218,7 @@ for data_item in data:
                                         "value": data
                                     }
                                     
-                                    tapis_handler.create_check_duplicates(doc, key_fields, replace = False)
+                                    tapis_handler.create_check_duplicates(doc, key_fields)
                                 #increment state col
                                 state_data["col"] += 1
                         #finished row, move state row, reset col

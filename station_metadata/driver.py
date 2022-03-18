@@ -92,6 +92,6 @@ with open(file, "r") as fd:
                 "value": data
             }
             key_fields = ["station_group", "station_id"]
-            tapis_handler.create_check_duplicates(doc, key_fields, replace = False)
+            tapis_handler.create_check_duplicates(doc, key_fields)
 print("Complete!")
                         
