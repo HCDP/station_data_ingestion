@@ -28,7 +28,7 @@ if len(argv) < 2:
         Invalid command line args. Must contain a config file.
 
         usage:
-        station_ingestor.py <config_file> [<state_file>]
+        driver.py <config_file> [<state_file>]
     """, file = stderr)
     exit(1)
 
@@ -79,19 +79,18 @@ with open(file, "r") as fd:
             data = {
                 "station_group": station_group,
                 "id_field": id_field,
-                "value": {}
             }
             for i in range(len(row)):       
                 prop = header[i]
                 value = row[i]
                 if value != nodata:
-                    data["value"][prop] = value
+                    data[prop] = value
 
             doc = {
                 "name": "hcdp_station_metadata",
                 "value": data
             }
-            key_fields = ["station_group", "station_id"]
+            key_fields = ["station_group", id_field]
             tapis_handler.create_check_duplicates(doc, key_fields)
 print("Complete!")
                         
