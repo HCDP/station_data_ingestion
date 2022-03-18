@@ -7,7 +7,7 @@
     "prop_translations": {
         "SKN": "skn",
         "Station.Name": "name",
-        "OBSERVER": "observer",
+        "Observer": "observer",
         "Network": "network",
         "Island": "island",
         "ELEV.m.": "elevation_m",
