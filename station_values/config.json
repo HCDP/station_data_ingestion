@@ -6,6 +6,7 @@
     },
     "data": [
         {
+            "replace_duplicates": true,
             "data_col_start": 13,
             "id_col": 0,
             "nodata": "NA",

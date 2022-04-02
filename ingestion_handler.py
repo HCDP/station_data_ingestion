@@ -25,6 +25,7 @@ class V2Handler:
     def __init__(self, config):
         self.__retry = config["retry"]
         self.__url = config["tenant_url"]
+        self.__db_write_api_url = config["db_write_api_url"]
 
         token = config["token"]
 
@@ -217,15 +218,20 @@ class V2Handler:
             #skip mode does nothing
 
     def delete(self, uuid):
-        meta_url = "%s/%s" % (self.__url, uuid)
+        delete_endpoint = "%s%s" % (self.__db_write_api_url, "/db/delete")
+        payload = {
+            "uuid": uuid
+        }
+        payload = json.dumps(payload)
 
         request_params = {
+            "data": payload,
             "headers": self.__headers,
             "verify": False
         }
 
         #wrap request in retry and get response
-        res_data = self.__req_with_retry(requests.delete, meta_url, request_params, self.__retry)
+        res_data = self.__req_with_retry(requests.post, delete_endpoint, request_params, self.__retry)
 
         #if errored out raise last error
         if res_data["error"] is not None:
@@ -250,9 +256,25 @@ class V2Handler:
 
 
     def replace(self, data, uuid):
-        #replace function in tapis rarely works, just delete the old document and create the new one
-        self.delete(uuid)
-        self.create(data)
+        replace_endpoint = "%s%s" % (self.__db_write_api_url, "/db/replace")
+        payload = {
+            "uuid": uuid,
+            "value": data["value"]
+        }
+        payload = json.dumps(payload)
+
+        request_params = {
+            "data": payload,
+            "headers": self.__headers,
+            "verify": False
+        }
+
+        #wrap request in retry and get response
+        res_data = self.__req_with_retry(requests.post, replace_endpoint, request_params, self.__retry)
+
+        #if errored out raise last error
+        if res_data["error"] is not None:
+            raise res_data["error"]
 
 
 

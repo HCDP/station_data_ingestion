@@ -4,6 +4,7 @@
         "token": "token",
         "retry": 3
     },
+    "replace_duplicates": true,
     "prop_translations": {
         "SKN": "skn",
         "Station.Name": "name",
