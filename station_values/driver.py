@@ -110,8 +110,15 @@ for data_item in data:
     files = data_item["files"]
 
     #optional props
-    data_col_start = data_item.get("data_col_start") or 1
-    id_col = data_item.get("id_col") or 0
+    replace_duplicates = data_item.get("replace_duplicates")
+    if replace_duplicates is None:
+        replace_duplicates = True
+    data_col_start = data_item.get("data_col_start")
+    if data_col_start is None:
+        data_col_start = 1
+    id_col = data_item.get("id_col")
+    if id_col is None:
+        id_col = 0
     nodata = data_item.get("nodata")
     if nodata is None:
         nodata = "NA"
@@ -218,7 +225,7 @@ for data_item in data:
                                         "value": data
                                     }
                                     
-                                    tapis_handler.create_check_duplicates(doc, key_fields)
+                                    tapis_handler.create_check_duplicates(doc, key_fields, replace = replace_duplicates)
                                 #increment state col
                                 state_data["col"] += 1
                         #finished row, move state row, reset col

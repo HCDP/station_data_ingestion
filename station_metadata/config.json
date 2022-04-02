@@ -2,13 +2,14 @@
     "tapis_config": {
         "tenant_url": "https://agaveauth.its.hawaii.edu/meta/v2/data",
         "token": "token",
-        "retry": 3
+        "retry": 3,
+        "db_write_api_url": "https://cistore.its.hawaii.edu:8443"
     },
     "replace_duplicates": true,
     "prop_translations": {
         "SKN": "skn",
         "Station.Name": "name",
-        "OBSERVER": "observer",
+        "Observer": "observer",
         "Network": "network",
         "Island": "island",
         "ELEV.m.": "elevation_m",
@@ -23,5 +24,6 @@
     "nodata": "NA",
     "id_field": "skn",
     "station_group": "hawaii_climate_primary",
-    "file": ""
+    "file": "Hawaii_Master_Station_Meta.csv"
+    
 }

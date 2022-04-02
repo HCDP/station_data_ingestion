@@ -28,7 +28,7 @@ if len(argv) < 2:
         Invalid command line args. Must contain a config file.
 
         usage:
-        station_ingestor.py <config_file> [<state_file>]
+        driver.py <config_file> [<state_file>]
     """, file = stderr)
     exit(1)
 
@@ -40,27 +40,33 @@ config = get_config(config_file)
 ##################################
 ##################################
 
-
-
     
 file = config["file"]
 tapis_config = config["tapis_config"]
 prop_translations = config["prop_translations"]
+replace_duplicates = config.get("replace_duplicates")
+if replace_duplicates is None:
+    replace_duplicates = True
 
-#in case have multiple station setswith separate id universes
+#in case have multiple station sets with separate id universes
 id_field = config["id_field"]
 station_group = config["station_group"]
 nodata = config["nodata"]
+
+start_col = config.get("start_col")
+if start_col is None:
+    start_col = 0
+end_col = config.get("end_col")
 
 tapis_handler = V2Handler(tapis_config)
 with open(file, "r") as fd:
     reader = csv.reader(fd)
     header = None
-    station_id_index = 0
     for row in reader:
-        row = row[1:]
+        if end_col is None:
+            end_col = len(row)
+        row = row[start_col:end_col]
         if header is None:
-            #start at 1 because metadata has weird index col (temp????)
             header = row
             for i in range(len(header)):
                 prop = header[i]
@@ -72,24 +78,19 @@ with open(file, "r") as fd:
         else:
             data = {
                 "station_group": station_group,
-                "station_id": None,
                 "id_field": id_field,
-                "value": {}
             }
             for i in range(len(row)):       
                 prop = header[i]
                 value = row[i]
-                if value == nodata:
-                    value = None
-                data["value"][prop] = value
-                if i == station_id_index:
-                    data["station_id"] = value
+                if value != nodata:
+                    data[prop] = value
 
             doc = {
                 "name": "hcdp_station_metadata",
                 "value": data
             }
-            
-            tapis_handler.create_or_replace(doc, ["station_group", "station_id"])
+            key_fields = ["station_group", id_field]
+            tapis_handler.create_check_duplicates(doc, key_fields, replace = replace_duplicates)
 print("Complete!")
                         
