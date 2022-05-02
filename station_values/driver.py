@@ -138,9 +138,9 @@ for data_item in data:
     
     #convert dates to datetimes
     if start_date is not None:
-        start_date = isoToDate(start_date)
+        start_date = isoToDate(start_date, period)
     if end_date is not None:
-        end_date = isoToDate(end_date)
+        end_date = isoToDate(end_date, period)
     #make sure end date is not before start date if both defined
     if start_date is not None and end_date is not None and end_date < start_date:
         raise Exception("Invalid date range")
