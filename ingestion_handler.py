@@ -275,10 +275,3 @@ class V2Handler:
         #if errored out raise last error
         if res_data["error"] is not None:
             raise res_data["error"]
-
-
-
-
-
-
-    

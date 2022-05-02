@@ -18,3 +18,15 @@ class DateParser:
 
     def getDatetime(self):
         return self.datetime
+
+
+def isoToDate(iso_string, period):
+    date = ""
+    if period == "day":
+        date = datetime.strptime(iso_string, "%Y-%m-%d")
+    elif period == "month":
+        date = datetime.strptime(iso_string, "%Y-%m")
+    else:
+        raise ValueError("Unknown period.")
+
+    return date

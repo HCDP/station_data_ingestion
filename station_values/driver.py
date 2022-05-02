@@ -2,7 +2,6 @@ import csv
 import json
 from sys import stderr, argv, exit
 import sys
-from dateutil import parser
 import signal
 import sys
 import os
@@ -13,7 +12,7 @@ from os.path import isfile
 sys.path.insert(1, os.path.realpath(os.path.pardir))
 
 from ingestion_handler import V2Handler
-from date_parser import DateParser
+from date_parser import DateParser, isoToDate
 from os.path import isfile
 
 
@@ -139,9 +138,9 @@ for data_item in data:
     
     #convert dates to datetimes
     if start_date is not None:
-        start_date = parser.parse(start_date)
+        start_date = isoToDate(start_date)
     if end_date is not None:
-        end_date = parser.parse(end_date)
+        end_date = isoToDate(end_date)
     #make sure end date is not before start date if both defined
     if start_date is not None and end_date is not None and end_date < start_date:
         raise Exception("Invalid date range")
