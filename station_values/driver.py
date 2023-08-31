@@ -171,7 +171,7 @@ for data_item in data:
             for row in reader:
                 #check if header row
                 if dates is None:
-                    range_end = len(row)
+                    range_end = range_start
                     dates = []
                     #transform dates
                     for i in range(len(row)):
@@ -185,9 +185,7 @@ for data_item in data:
                                 dates.append(date_s)
                                 if date == start_date:
                                     range_start = i
-                            elif end_date is not None and date > end_date:
-                                range_end = i
-                                break
+                                range_end = i + 1
                 #data rows
                 else:
                     #if before the row indicated in the state object, skip
