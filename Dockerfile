@@ -12,6 +12,6 @@ RUN mkdir /actor
 ADD src /home/hcdp_tapis_ingestor
 
 # Copy the file downloader, make /ingest directory
-ADD /utils/* /actor
+ADD /utils /actor
 
 CMD [ "/bin/bash", "/actor/task.sh" ]
