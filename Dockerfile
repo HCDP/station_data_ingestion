@@ -7,6 +7,7 @@ RUN apt update
 RUN apt install -y curl
 
 RUN mkdir -p /home/hcdp_tapis_ingestor
+RUN mkdir /actor
 
 ADD src /home/hcdp_tapis_ingestor
 
