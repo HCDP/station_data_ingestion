@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "[task.sh] Starting Execution."
-cd /home/hcdp_tapis_ingestor
+cd /home/hcdp_tapis_ingestor/station_values
 
 echo "[task.sh] [1/6] Downloading ingestion config."
 wget $INGESTION_CONFIG_URL -O config.json
@@ -34,6 +34,6 @@ echo "[task.sh] [5/6] Injecting authentication into config."
 python3 /actor/inject_auth.py IW_TOKEN.txt config.json
 
 echo "[task.sh] [6/6] Ingesting station values."
-python3 station_values/driver.py config.json
+python3 driver.py config.json
 
 echo "[task.sh] All done!"
