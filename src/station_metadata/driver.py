@@ -3,7 +3,6 @@ import re
 import json
 from sys import stderr, argv
 from os.path import join
-
 import sys
 import os
 
@@ -11,12 +10,7 @@ sys.path.insert(1, os.path.realpath(os.path.pardir))
 
 from ingestion_handler import V2Handler
 from date_parser import DateParser
-
-def get_config(config_file):
-    config = None
-    with open(config_file) as f:
-        config = json.load(f)
-    return config
+from get_config import get_config
 
 
 ######

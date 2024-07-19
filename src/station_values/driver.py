@@ -13,7 +13,7 @@ sys.path.insert(1, os.path.realpath(os.path.pardir))
 
 from ingestion_handler import V2Handler
 from date_parser import DateParser, isoToDate
-from os.path import isfile
+from get_config import get_config
 
 
 def write_state(state_data, state_file):
@@ -39,12 +39,6 @@ def get_state(state_file):
                 state_data = json.load(f)
 
     return state_data
-
-def get_config(config_file):
-    config = None
-    with open(config_file) as f:
-        config = json.load(f)
-    return config
 
 
 ######

@@ -6,6 +6,7 @@ import json
 import random
 from enum import Enum
 import urllib3
+import os
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class MultipleMatchMode(Enum):
@@ -24,13 +25,16 @@ class RecordNotUniqueException(Exception):
 class V2Handler:
     def __init__(self, config):
         self.__retry = config["retry"]
-        self.__url = config["tenant_url"]
-        self.__db_write_api_url = config["db_write_api_url"]
+        self.__agave_url = f"{config['tenant_url']}/meta/v2/data"
+        self.__hcdp_api_url = config["hcdp_api_url"]
 
-        token = config["token"]
+        self.__agave_headers = {
+            "Authorization": f"Bearer {config['agave_token']}",
+            "Content-Type": "application/json"
+        }
 
-        self.__headers = {
-            "Authorization": "Bearer %s" % token,
+        self.__hcdp_headers = {
+            "Authorization": f"Bearer {config['hcdp_api_token']}",
             "Content-Type": "application/json"
         }
 
@@ -89,9 +93,9 @@ class V2Handler:
         return status_group == 2
 
     def retrieve_by_uuid(self, uuid):
-        url = "%s/%s" % (self.__url, uuid)
+        url = f"{self.__agave_url}/{uuid}"
         params = {
-            "headers": self.__headers,
+            "headers": self.__agave_headers,
             "verify": False
         }
         res_data = self.__req_with_retry(requests.get, url, params, self.__retry)
@@ -119,11 +123,11 @@ class V2Handler:
 
         request_params = {
             "params": params,
-            "headers": self.__headers,
+            "headers": self.__agave_headers,
             "verify": False
         }
 
-        res_data = self.__req_with_retry(requests.get, self.__url, request_params, self.__retry)
+        res_data = self.__req_with_retry(requests.get, self.__agave_url, request_params, self.__retry)
 
         #if errored out raise last error
         if res_data["error"] is not None:
@@ -149,7 +153,7 @@ class V2Handler:
         }
 
         for field in key_fields:
-            key = "value.%s" % field
+            key = f"value.{field}"
             key_data[key] = data["value"][field]
         uuids = self.query_uuids(key_data)
         num_uuids = len(uuids)
@@ -218,7 +222,7 @@ class V2Handler:
             #skip mode does nothing
 
     def delete(self, uuid):
-        delete_endpoint = "%s%s" % (self.__db_write_api_url, "/db/delete")
+        delete_endpoint = f"{self.__hcdp_api_url}/db/delete"
         payload = {
             "uuid": uuid
         }
@@ -226,7 +230,7 @@ class V2Handler:
 
         request_params = {
             "data": payload,
-            "headers": self.__headers,
+            "headers": self.__hcdp_headers,
             "verify": False
         }
 
@@ -243,12 +247,12 @@ class V2Handler:
 
         request_params = {
             "data": payload,
-            "headers": self.__headers,
+            "headers": self.__agave_headers,
             "verify": False
         }
 
         #wrap request in retry and get response
-        res_data = self.__req_with_retry(requests.post, self.__url, request_params, self.__retry)
+        res_data = self.__req_with_retry(requests.post, self.__agave_url, request_params, self.__retry)
 
         #if errored out raise last error
         if res_data["error"] is not None:
@@ -256,7 +260,7 @@ class V2Handler:
 
 
     def replace(self, data, uuid):
-        replace_endpoint = "%s%s" % (self.__db_write_api_url, "/db/replace")
+        replace_endpoint = f"{self.__hcdp_api_url}/db/replace"
         payload = {
             "uuid": uuid,
             "value": data["value"]
@@ -265,7 +269,7 @@ class V2Handler:
 
         request_params = {
             "data": payload,
-            "headers": self.__headers,
+            "headers": self.__hcdp_headers,
             "verify": False
         }
 
