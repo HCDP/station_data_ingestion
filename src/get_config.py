@@ -9,6 +9,7 @@ def get_auth(tenant_url):
     # Get token from response.
     full_token = json.loads(res.stdout.decode())
     access_token = full_token["access_token"]
+    return access_token
 
 def get_config(config_file):
     config = None
