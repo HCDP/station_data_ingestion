@@ -228,7 +228,10 @@ for data_item in data:
                                         docs.append(doc)
 
             fd.close()
-            tapis_handler.bulkDelete(delete)
+            print(f"deleting {len(delete)}")
+            if(len(delete) > 0):
+                tapis_handler.bulkDelete(delete)
+            print(f"creating {len(docs)}")
             for doc in docs:
                 tapis_handler.create(doc)
 
