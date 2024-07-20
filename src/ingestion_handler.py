@@ -146,7 +146,11 @@ class V2Handler:
         return uuids
 
     def check_duplicate(self, data, key_fields):
-        duplicate = None
+        duplicate_data = {
+            "is_duplicate": False,
+            "changed": False,
+            "duplicate_uuid": None
+        }
         key_data = {
             "name": data["name"],
         }
@@ -159,9 +163,11 @@ class V2Handler:
         if len(matches) > 1:
             raise RecordNotUniqueException("Multiple entries match the specified key data")
         #python can compare dicts with ==
-        elif len(matches) == 1 and matches[0]["value"] == data["value"]:
-            duplicate = matches[0]["uuid"]
-        return duplicate
+        elif len(matches) == 1:
+            duplicate_data["is_duplicate"] = True
+            duplicate_data["duplicate_uuid"] = matches[0]["uuid"]
+            duplicate_data["changed"] = (matches[0]["value"] != data["value"])
+        return duplicate_data
 
     def bulkDelete(self, uuids):
         delete_endpoint = f"{self.__hcdp_api_url}/db/bulkDelete"

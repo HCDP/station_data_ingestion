@@ -218,12 +218,14 @@ for data_item in data:
                                         "name": "hcdp_station_value",
                                         "value": data
                                     }
-                                    duplicate_id = tapis_handler.check_duplicate(doc, key_fields)
-                                    
-                                    if duplicate_id is None or replace_duplicates:
+                                    duplicate_data = tapis_handler.check_duplicate(doc, key_fields)
+                                    #if not a duplicate create doc
+                                    if not duplicate_data["is_duplicate"]:
                                         docs.append(doc)
-                                    elif duplicate_id is not None:
-                                        delete.append(duplicate_id)
+                                    #otherwide if duplicates should be replaced and it is different than the old document, delete the old document and create
+                                    elif replace_duplicates and duplicate_data["changed"]:
+                                        delete.append(duplicate_data["duplicate_uuid"])
+                                        docs.append(doc)
 
             fd.close()
             tapis_handler.bulkDelete(delete)
