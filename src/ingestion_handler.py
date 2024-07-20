@@ -147,6 +147,44 @@ class V2Handler:
             uuids.append(record["uuid"])
         return uuids
 
+    def check_duplicate(self, data, key_fields):
+        duplicate = None
+        key_data = {
+            "name": data["name"],
+        }
+
+        for field in key_fields:
+            key = f"value.{field}"
+            key_data[key] = data["value"][field]
+        matches = self.query_data(key_data)
+        #just throw an error if multiple, not used in any other way for now
+        if len(matches) > 1:
+            raise RecordNotUniqueException("Multiple entries match the specified key data")
+        #python can compare dicts with ==
+        elif len(matches) == 1 and matches[0]["value"] == data["value"]:
+            duplicate = matches[0]["uuid"]
+        return duplicate
+
+    def bulkDelete(self, uuids):
+        delete_endpoint = f"{self.__hcdp_api_url}/db/bulkDelete"
+        payload = {
+            "uuids": uuids
+        }
+        payload = json.dumps(payload)
+
+        request_params = {
+            "data": payload,
+            "headers": self.__hcdp_headers,
+            "verify": False
+        }
+
+        #wrap request in retry and get response
+        res_data = self.__req_with_retry(requests.post, delete_endpoint, request_params, self.__retry)
+
+        #if errored out raise last error
+        if res_data["error"] is not None:
+            raise res_data["error"]
+
 
     def create_check_duplicates(self, data, key_fields, replace = True, multiple_match_mode = MultipleMatchMode.ERROR):
         key_data = {

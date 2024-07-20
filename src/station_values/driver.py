@@ -140,8 +140,11 @@ for data_item in data:
         raise Exception("Invalid date range")
 
     for i in range(len(files)):
+        state_data["file"] = i
         #if file listed in state data is after this one skip
-        if file_num >= state_data["file"]:
+        if i >= state_data["file"]:
+            docs = []
+            delete = []
             file = files[i]
             #check if file exists on local system
             is_local_file = isfile(file)
@@ -215,23 +218,17 @@ for data_item in data:
                                         "name": "hcdp_station_value",
                                         "value": data
                                     }
+                                    duplicate_id = tapis_handler.check_duplicate(doc, key_fields)
                                     
-                                    tapis_handler.create_check_duplicates(doc, key_fields, replace = replace_duplicates)
-                                #increment state col
-                                state_data["col"] += 1
-                        #finished row, move state row, reset col
-                        state_data["row"] += 1
-                        state_data["col"] = 0
-                    #increment current row
-                    row_num += 1
-            fd.close()
-            #finished file, move state file, reset row and col
-            state_data["file"] += 1
-            state_data["row"] = 0
-            state_data["col"] = 0
-        #iterate file num
-        file_num += 1
+                                    if duplicate_id is None or replace_duplicates:
+                                        docs.append(doc)
+                                    elif duplicate_id is not None:
+                                        delete.append(duplicate_id)
 
+            fd.close()
+            tapis_handler.bulkDelete(delete)
+            for doc in docs:
+                tapis_handler.create(doc)
 
 state_data["complete"] = True
 write_state(state_data, state_file)
