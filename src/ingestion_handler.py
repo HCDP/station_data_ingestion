@@ -27,8 +27,6 @@ class V2Handler:
         self.__retry = config["retry"]
         self.__agave_url = f"{config['tenant_url']}/meta/v2/data"
         self.__hcdp_api_url = config["hcdp_api_url"]
-        print(config)
-        print(config['agave_token'])
         self.__agave_headers = {
             "Authorization": f"Bearer {config['agave_token']}",
             "Content-Type": "application/json"
