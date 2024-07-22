@@ -1,11 +1,11 @@
 #!/bin/bash
 echo "[task.sh] Starting Execution."
-cd /home/hcdp_tapis_ingestor/station_values
+cd /home/hcdp_tapis_ingestor
 
 echo "[task.sh] [1/3] Downloading ingestion config."
 wget $INGESTION_CONFIG_URL -O config_temp.json
 
-echo "[task.sh] [2/3] Updating date strings in config if requested."
+echo "[task.sh] [2/3] Updating date strings in config"
 python3 /actor/update_date_string_in_config.py config_temp.json config.json $CUSTOM_DATE
 
 echo "[task.sh] [3/3] Ingesting station values."

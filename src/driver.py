@@ -9,11 +9,9 @@ from traceback import print_exception
 import requests
 from os.path import isfile
 
-sys.path.insert(1, os.path.realpath(os.path.pardir))
-
-from ingestion_handler import V2Handler
-from date_parser import DateParser, isoToDate
-from get_config import get_config
+from modules.ingestion_handler import V2Handler
+from modules.date_parser import DateParser, isoToDate
+from modules.get_config import get_config
 
 
 def write_state(state_data, state_file):
@@ -146,15 +144,18 @@ for data_item in data:
             docs = []
             delete = []
             file = files[i]
+            print(f"Processing file {file}")
             #check if file exists on local system
             is_local_file = isfile(file)
             fd = None
             #if local file open and assign fd to file ref
             if is_local_file:
+                print("Found local file.")
                 fd = open(file, "r")
             #otherwise try to get remote file
             #if file does not exist or an error occurs the exception will be caught by the default exception handler and the program will terminate at the invalid file
             else:
+                print("Could not find local file. Attempting to open remote file.")
                 res = requests.get(file, stream = True)
                 res.raise_for_status()
                 #csv requires text not bytes, decode (assumes utf-8)
@@ -228,10 +229,10 @@ for data_item in data:
                                         docs.append(doc)
 
             fd.close()
-            print(f"deleting {len(delete)}")
+            print(f"Deleting {len(delete)} duplicate documents")
             if(len(delete) > 0):
                 tapis_handler.bulkDelete(delete)
-            print(f"creating {len(docs)}")
+            print(f"Creating {len(docs)} new documents")
             for doc in docs:
                 tapis_handler.create(doc)
 

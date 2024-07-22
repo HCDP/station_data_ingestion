@@ -9,16 +9,7 @@ import urllib3
 import os
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-class MultipleMatchMode(Enum):
-    ERROR = 0
-    FIRST_MATCH = 1
-    FIRST_MATCH_WARN = 2
-    SKIP = 3
-    SKIP_WARN = 4
-    ALL = 5
-    ALL_WARN = 6
-
-class RecordNotUniqueException(Exception):
+class RecordKeyException(Exception):
     pass
 
 
@@ -86,10 +77,12 @@ class V2Handler:
             backoff = delay * 2 + random.uniform(0, delay)
         return backoff
 
+
     def __get_success(self, res):
         status = res.status_code
         status_group = status // 100
         return status_group == 2
+
 
     def retrieve_by_uuid(self, uuid):
         url = f"{self.__agave_url}/{uuid}"
@@ -105,7 +98,6 @@ class V2Handler:
         res = res_data["response"]
         data = res.json()["result"]
         return data
-
 
 
     def query_data(self, data, limit = None, offset = None):
@@ -136,6 +128,7 @@ class V2Handler:
         data = res.json()["result"]
         return data
 
+
     def query_uuids(self, data, limit = None, offset = None):
         uuids = []
         #get result of query
@@ -144,6 +137,7 @@ class V2Handler:
         for record in data:
             uuids.append(record["uuid"])
         return uuids
+
 
     def check_duplicate(self, data, key_fields):
         duplicate_data = {
@@ -161,7 +155,7 @@ class V2Handler:
         matches = self.query_data(key_data)
         #just throw an error if multiple, not used in any other way for now
         if len(matches) > 1:
-            raise RecordNotUniqueException("Multiple entries match the specified key data")
+            raise RecordKeyException("Multiple entries match the specified key data")
         #python can compare dicts with ==
         elif len(matches) == 1:
             duplicate_data["is_duplicate"] = True
@@ -169,10 +163,20 @@ class V2Handler:
             duplicate_data["changed"] = (matches[0]["value"] != data["value"])
         return duplicate_data
 
-    def bulkDelete(self, uuids):
-        delete_endpoint = f"{self.__hcdp_api_url}/db/bulkDelete"
+
+    def create_check_duplicates(self, data, key_fields, replace = True, multiple_match_mode = MultipleMatchMode.ERROR):
+        duplicate_data = self.check_duplicate(data, key_fields)
+
+        if not duplicate_data["is_duplicate"]:
+            self.create(data)
+        elif replace and duplicate_data["changed"]:
+            self.replace(data, duplicate_data["duplicate_uuid"])
+            
+
+    def delete(self, uuid):
+        delete_endpoint = f"{self.__hcdp_api_url}/db/delete"
         payload = {
-            "uuids": uuids
+            "uuid": uuid
         }
         payload = json.dumps(payload)
 
@@ -188,86 +192,12 @@ class V2Handler:
         #if errored out raise last error
         if res_data["error"] is not None:
             raise res_data["error"]
+    
 
-
-    def create_check_duplicates(self, data, key_fields, replace = True, multiple_match_mode = MultipleMatchMode.ERROR):
-        key_data = {
-            "name": data["name"],
-        }
-
-        for field in key_fields:
-            key = f"value.{field}"
-            key_data[key] = data["value"][field]
-        uuids = self.query_uuids(key_data)
-        num_uuids = len(uuids)
-        #create new record if none exists matching key fields
-        if num_uuids == 0:
-            self.create(data)
-        elif replace:
-            #replace data on match and handle multiple matches according to mode
-            if num_uuids == 1 or multiple_match_mode == MultipleMatchMode.FIRST_MATCH:
-                uuid = uuids[0]
-                self.replace(data, uuid)
-            elif multiple_match_mode == MultipleMatchMode.FIRST_MATCH_WARN:
-                print("Warning: found multiple entries matching the specified key data. Replacing first match...")
-                uuid = uuids[0]
-                self.replace(data, uuid)
-            elif multiple_match_mode == MultipleMatchMode.ALL:
-                #replace first and delete rest
-                first = True
-                for uuid in uuids:
-                    if first:
-                        self.replace(data, uuid)
-                        first = False
-                    else:
-                        self.delete(uuid)
-            elif multiple_match_mode == MultipleMatchMode.ALL_WARN:
-                print("Warning: found multiple entries matching the specified key data. Replacing all matches...")
-                #replace first and delete rest
-                first = True
-                for uuid in uuids:
-                    if first:
-                        self.replace(data, uuid)
-                        first = False
-                    else:
-                        self.delete(uuid)
-            elif multiple_match_mode == MultipleMatchMode.SKIP_WARN:
-                print("Warning: found multiple entries matching the specified key data. Skipping...")
-            elif multiple_match_mode == MultipleMatchMode.ERROR:
-                raise RecordNotUniqueException("Multiple entries match the specified key data")
-            #skip mode does nothing
-
-
-    def delete_by_key(self, key_data, multiple_delete_mode = MultipleMatchMode.ALL):
-        uuids = self.query_uuids(key_data)
-        num_uuids = len(uuids)
-        #if 0 matches do nothing
-        if num_uuids > 0:
-            #delete data on match and handle multiple matches according to mode
-            if num_uuids == 1 or multiple_delete_mode == MultipleMatchMode.FIRST_MATCH:
-                uuid = uuids[0]
-                self.delete(uuid)
-            elif multiple_delete_mode == MultipleMatchMode.FIRST_MATCH_WARN:
-                print("Warning: found multiple entries matching the specified key data. Deleting first match...")
-                uuid = uuids[0]
-                self.delete(uuid)
-            elif multiple_delete_mode == MultipleMatchMode.ALL:
-                for uuid in uuids:
-                    self.delete(uuid)
-            elif multiple_delete_mode == MultipleMatchMode.ALL_WARN:
-                print("Warning: found multiple entries matching the specified key data. Deleting all matches...")
-                for uuid in uuids:
-                    self.delete(uuid)
-            elif multiple_delete_mode == MultipleMatchMode.SKIP_WARN:
-                print("Warning: found multiple entries matching the specified key data. Skipping...")
-            elif multiple_delete_mode == MultipleMatchMode.ERROR:
-                raise RecordNotUniqueException("Multiple entries match the specified key data")
-            #skip mode does nothing
-
-    def delete(self, uuid):
-        delete_endpoint = f"{self.__hcdp_api_url}/db/delete"
+    def bulkDelete(self, uuids):
+        delete_endpoint = f"{self.__hcdp_api_url}/db/bulkDelete"
         payload = {
-            "uuid": uuid
+            "uuids": uuids
         }
         payload = json.dumps(payload)
 
