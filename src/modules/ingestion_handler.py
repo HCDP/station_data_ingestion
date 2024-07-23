@@ -164,7 +164,7 @@ class V2Handler:
         return duplicate_data
 
 
-    def create_check_duplicates(self, data, key_fields, replace = True, multiple_match_mode = MultipleMatchMode.ERROR):
+    def create_check_duplicates(self, data, key_fields, replace = True):
         duplicate_data = self.check_duplicate(data, key_fields)
 
         if not duplicate_data["is_duplicate"]:
