@@ -99,6 +99,10 @@ file_num = 0
 
 for data_item in data:
     files = data_item["files"]
+    
+    doc_name = data_item.get("doc_name")
+    if doc_name is None:
+        doc_name = "hcdp_station_value"
 
     #optional props
     replace_duplicates = data_item.get("replace_duplicates")
@@ -216,7 +220,7 @@ for data_item in data:
                                         data[prop_key] = prop_value
 
                                     doc = {
-                                        "name": "hcdp_station_value",
+                                        "name": doc_name,
                                         "value": data
                                     }
                                     duplicate_data = tapis_handler.check_duplicate(doc, key_fields)
