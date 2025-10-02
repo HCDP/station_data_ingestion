@@ -167,70 +167,70 @@ for data_item in data:
             reader = csv.reader(fd)
             dates = None
             range_start = data_col_start
-            range_end = None
+            range_end = range_start
             #current data row
             row_num = 0
+            
+            # process header
+            header = next(reader)  
+            dates = []
+            #transform dates
+            for i in range(len(header)):
+                #if before start index, skip
+                if i >= range_start:
+                    #create date parser from current date and period
+                    date_handler = DateParser(header[i], period)
+                    date = date_handler.getDatetime()
+                    date_s = date_handler.getISOString()
+                    if (start_date is None or date >= start_date) and (end_date is None or date <= end_date):
+                        dates.append(date_s)
+                        if date == start_date:
+                            range_start = i
+                        range_end = i + 1
+                            
+            # process data rows
             for row in reader:
-                #check if header row
-                if dates is None:
-                    range_end = range_start
-                    dates = []
-                    #transform dates
-                    for i in range(len(row)):
-                        #if before start index, skip
-                        if i >= range_start:
-                            #create date parser from current date and period
-                            date_handler = DateParser(row[i], period)
-                            date = date_handler.getDatetime()
-                            date_s = date_handler.getISOString()
-                            if (start_date is None or date >= start_date) and (end_date is None or date <= end_date):
-                                dates.append(date_s)
-                                if date == start_date:
-                                    range_start = i
-                                range_end = i + 1
-                #data rows
-                else:
-                    #if before the row indicated in the state object, skip
-                    if row_num >= state_data["row"]:
-                        station_id = row[id_col]
-                        #cut values to data range
-                        values = row[range_start:range_end]
-                        for col in range(len(values)):
-                            #if before the column indicated in the state object, skip
-                            if col >= state_data["col"]:
-                                value = values[col]
-                                #if value is nodata skip
-                                if value != nodata:
-                                    #transform to numeric
-                                    value_f = float(value)
-                                    
-                                    date = dates[col]
+                #if empty line or before the row indicated in the state object, skip
+                if len(row) > 0 and row_num >= state_data["row"]:
+                    station_id = row[id_col]
+                    #cut values to data range
+                    values = row[range_start:range_end]
+                    for col in range(len(values)):
+                        #if before the column indicated in the state object, skip
+                        if col >= state_data["col"]:
+                            value = values[col]
+                            #if value is nodata skip
+                            if value != nodata:
+                                #transform to numeric
+                                value_f = float(value)
+                                
+                                date = dates[col]
 
-                                    data = {
-                                        "datatype": datatype,
-                                        "fill": fill,
-                                        "period": period,
-                                        "station_id": station_id,
-                                        "date": date,
-                                        "value": value_f
-                                    }
+                                data = {
+                                    "datatype": datatype,
+                                    "fill": fill,
+                                    "period": period,
+                                    "station_id": station_id,
+                                    "date": date,
+                                    "value": value_f
+                                }
 
-                                    #set up non-required props
-                                    for prop_key, prop_value in additional_props.items():
-                                        data[prop_key] = prop_value
+                                #set up non-required props
+                                for prop_key, prop_value in additional_props.items():
+                                    data[prop_key] = prop_value
 
-                                    doc = {
-                                        "name": doc_name,
-                                        "value": data
-                                    }
-                                    duplicate_data = tapis_handler.check_duplicate(doc, key_fields)
-                                    #if not a duplicate create doc
-                                    if not duplicate_data["is_duplicate"]:
-                                        docs.append(doc)
-                                    #otherwide if duplicates should be replaced and it is different than the old document, delete the old document and create
-                                    elif replace_duplicates and duplicate_data["changed"]:
-                                        delete.append(duplicate_data["duplicate_uuid"])
-                                        docs.append(doc)
+                                doc = {
+                                    "name": doc_name,
+                                    "value": data
+                                }
+                                duplicate_data = tapis_handler.check_duplicate(doc, key_fields)
+                                #if not a duplicate create doc
+                                if not duplicate_data["is_duplicate"]:
+                                    docs.append(doc)
+                                #otherwide if duplicates should be replaced and it is different than the old document, delete the old document and create
+                                elif replace_duplicates and duplicate_data["changed"]:
+                                    delete.append(duplicate_data["duplicate_uuid"])
+                                    docs.append(doc)
 
             fd.close()
             print(f"Deleting {len(delete)} duplicate documents")
