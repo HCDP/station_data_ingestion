@@ -8,6 +8,7 @@ from enum import Enum
 import urllib3
 import os
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from tapipy.tapis import Tapis
 
 class RecordKeyException(Exception):
     pass
@@ -252,3 +253,168 @@ class V2Handler:
         #if errored out raise last error
         if res_data["error"] is not None:
             raise res_data["error"]
+        
+        
+        
+        
+
+
+
+class V3Handler:
+    def __init__(self, config = {}):
+        self.__retries = config.get("retries") or int(os.getenv("TAPIS_V3_RETRIES"))
+        tenant = config.get("tenant") or os.getenv("TAPIS_V3_TENANT")
+        base_url = config.get("url") or os.getenv("TAPIS_V3_URL")
+        username = config.get("username") or os.getenv("TAPIS_V3_USERNAME")
+        password = config.get("password") or os.getenv("TAPIS_V3_PASSWORD")
+        self.__db = config.get("db") or os.getenv("TAPIS_V3_DB")
+        self.__collection = config.get("collection") or os.getenv("TAPIS_V3_COLLECTION")
+
+        # Create python Tapis client for user
+        self.__client = Tapis(
+            base_url = base_url, 
+            username = username,
+            password = password, 
+            account_type = "user", 
+            tenant_id = tenant
+        )
+
+        # Generate an Access Token that will be used for all API calls
+        self.__client.get_tokens()
+        
+
+
+    def __get_backoff(self, delay):
+        backoff = 0
+        #if first failure backoff of 0.25-0.5 seconds
+        if delay == 0:
+            backoff = 0.25 + random.uniform(0, 0.25)
+        #otherwise 2-3x current backoff
+        else:
+            backoff = delay * 2 + random.uniform(0, delay)
+        return backoff
+
+
+    def __handle_retry(self, method, retries = None, delay = 0, ignore_exceptions = (), **kwargs):
+        if delay > 0:
+            sleep(delay)
+        if retries is None:
+            retries = self.__retries
+        try:
+            data = method(**kwargs)
+            if isinstance(data, bytes):
+                data = json.loads(data.decode('utf-8'))
+            return data
+        except Exception as e:
+            if type(e) in ignore_exceptions or retries < 1:
+                raise e
+            else:
+                return self.__handle_retry(method, retries = retries - 1, delay = self.__get_backoff(delay), ignore_exceptions = ignore_exceptions, **kwargs)
+            
+    def __create(self, data, db, collection):
+        if isinstance(data, list):
+            # Bulk ingest up to 500 docs at a time
+            chunk_size = 500
+            start = 0
+            end = 0
+            while end < len(data):
+                start = end
+                end = start + chunk_size
+                if end > len(data):
+                    end = len(data)
+                chunk = data[start : end]
+                self.__handle_retry(self.__client.meta.createDocument, db = db, collection = collection, request_body = chunk)
+        else:
+            self.__handle_retry(self.__client.meta.createDocument, db = db, collection = collection, request_body = data)
+
+
+
+    def __replace(self, uuid, data, db, collection):
+        self.__handle_retry(self.__client.meta.replaceDocument, db = db, collection = collection, docId = uuid, request_body = data)
+            
+    
+    def get_uuid(self, uuid, db = None, collection = None):
+        if db is None:
+            db = self.__db
+        if collection is None:
+            db = self.__collection
+            
+        res = self.__handle_retry(self.__client.meta.listDocuments, db = db, collection = collection, docId = uuid)
+        return res
+            
+    
+    def query_data(self, data, limit = None, offset = None, db = None, collection = None):
+        if limit is None:
+            limit = 1000
+        if offset is None:
+            offset = 0
+        
+        if db is None:
+            db = self.__db
+        if collection is None:
+            db = self.__collection
+            
+        query = json.dumps(data)
+        res = self.__handle_retry(self.__client.meta.listDocuments, db = db, collection = collection, page = offset + 1, pagesize = limit, filter = query)
+        return res
+     
+
+    def create_docs_unsafe(self, data, db = None, collection = None):
+        if db is None:
+            db = self.__db
+        if collection is None:
+            db = self.__collection
+            
+        if len(data) > 1:
+            self.__create(data, db, collection)
+        elif len(data) > 0:
+            self.__create(data[0], db, collection)
+
+
+    def create_docs(self, data, key_fields, replace = True, db = None, collection = None):
+        if db is None:
+            db = self.__db
+        if collection is None:
+            db = self.__collection
+            
+        replace_docs = {}
+        create_docs = []
+        for doc in data:
+            key_data = {
+                "name": doc["name"],
+            }
+            for field in key_fields:
+                key = f"value.{field}"
+                key_data[key] = doc["value"][field]
+            matches = self.query_data(key_data, db = db, collection = collection)
+            # Throw an error if multiple docs match the key
+            if len(matches) > 1:
+                raise RecordKeyException("Multiple entries match the specified key data")
+            # Flag to replace if there is a single match, the replace flag is set, and the current value does not match the new value
+            elif len(matches) > 0 and replace and matches[0]["value"] != doc["value"]:
+                uuid = matches[0]["_id"]["$oid"]
+                replace_docs[uuid] = doc
+            elif len(matches) == 0:
+                create_docs.append(doc)
+        
+        replaced = 0
+        created = 0
+        for uuid in replace_docs:
+            new_doc = replace_docs[uuid]
+            self.__replace(uuid, new_doc, db, collection)
+            replaced += 1
+        if len(create_docs) > 1:
+            self.__create(create_docs, db, collection)
+            created += len(create_docs)
+        elif len(create_docs) > 0:
+            self.__create(create_docs[0], db, collection)
+            created += 1
+        return {
+            "replaced": replaced,
+            "created":  created
+        }
+        
+            
+
+    
+    

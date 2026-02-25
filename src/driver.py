@@ -4,14 +4,12 @@ from sys import stderr, argv, exit
 import sys
 import signal
 import sys
-import os
 from traceback import print_exception
 import requests
 from os.path import isfile
 
-from modules.ingestion_handler import V2Handler
+from modules.ingestion_handler import V3Handler
 from modules.date_parser import DateParser, isoToDate
-from modules.get_config import get_config
 
 
 def write_state(state_data, state_file):
@@ -58,7 +56,9 @@ state_file = None
 if len(argv) > 2:
     state_file = argv[2]
 
-config = get_config(config_file)
+config = None
+with open(config_file) as f:
+    config = json.load(f)
 state_data = get_state(state_file)
 
 
@@ -93,7 +93,7 @@ signal.signal(signal.SIGTERM, sig_handler)
 data = config["data"]
 tapis_config = config["tapis_config"]
 
-tapis_handler = V2Handler(tapis_config)
+tapis_handler = V3Handler(tapis_config)
 
 file_num = 0
 
@@ -151,94 +151,86 @@ for data_item in data:
             print(f"Processing file {file}")
             #check if file exists on local system
             is_local_file = isfile(file)
-            fd = None
-            #if local file open and assign fd to file ref
-            if is_local_file:
-                print("Found local file.")
-                fd = open(file, "r")
-            #otherwise try to get remote file
-            #if file does not exist or an error occurs the exception will be caught by the default exception handler and the program will terminate at the invalid file
-            else:
-                print("Could not find local file. Attempting to open remote file.")
-                res = requests.get(file, stream = True)
-                res.raise_for_status()
-                #csv requires text not bytes, decode (assumes utf-8)
-                fd = (line.decode("utf-8") for line in res.iter_lines())
-            reader = csv.reader(fd)
-            dates = None
-            range_start = data_col_start
-            range_end = range_start
-            #current data row
-            row_num = 0
             
-            # process header
-            header = next(reader)  
-            dates = []
-            #transform dates
-            for i in range(len(header)):
-                #if before start index, skip
-                if i >= range_start:
-                    #create date parser from current date and period
-                    date_handler = DateParser(header[i], period)
-                    date = date_handler.getDatetime()
-                    date_s = date_handler.getISOString()
-                    if (start_date is None or date >= start_date) and (end_date is None or date <= end_date):
-                        dates.append(date_s)
-                        if date == start_date:
-                            range_start = i
-                        range_end = i + 1
-                            
-            # process data rows
-            for row in reader:
-                #if empty line or before the row indicated in the state object, skip
-                if len(row) > 0 and row_num >= state_data["row"]:
-                    station_id = row[id_col]
-                    #cut values to data range
-                    values = row[range_start:range_end]
-                    for col in range(len(values)):
-                        #if before the column indicated in the state object, skip
-                        if col >= state_data["col"]:
-                            value = values[col]
-                            #if value is nodata skip
-                            if value != nodata:
-                                #transform to numeric
-                                value_f = float(value)
+            fd = None
+            try:
+                #if local file open and assign fd to file ref
+                if is_local_file:
+                    print("Found local file.")
+                    fd = open(file, "r")
+                #otherwise try to get remote file
+                #if file does not exist or an error occurs the exception will be caught by the default exception handler and the program will terminate at the invalid file
+                else:
+                    print("Could not find local file. Attempting to open remote file.")
+                    res = requests.get(file, stream = True)
+                    res.raise_for_status()
+                    #csv requires text not bytes, decode (assumes utf-8)
+                    fd = (line.decode("utf-8") for line in res.iter_lines())
+                reader = csv.reader(fd)
+                dates = None
+                range_start = data_col_start
+                range_end = range_start
+                #current data row
+                row_num = 0
+                
+                # process header
+                header = next(reader)  
+                dates = []
+                #transform dates
+                for i in range(len(header)):
+                    #if before start index, skip
+                    if i >= range_start:
+                        #create date parser from current date and period
+                        date_handler = DateParser(header[i], period)
+                        date = date_handler.getDatetime()
+                        date_s = date_handler.getISOString()
+                        if (start_date is None or date >= start_date) and (end_date is None or date <= end_date):
+                            dates.append(date_s)
+                            if date == start_date:
+                                range_start = i
+                            range_end = i + 1
                                 
-                                date = dates[col]
+                # process data rows
+                for row in reader:
+                    #if empty line or before the row indicated in the state object, skip
+                    if len(row) > 0 and row_num >= state_data["row"]:
+                        station_id = row[id_col]
+                        #cut values to data range
+                        values = row[range_start:range_end]
+                        for col in range(len(values)):
+                            #if before the column indicated in the state object, skip
+                            if col >= state_data["col"]:
+                                value = values[col]
+                                #if value is nodata skip
+                                if value != nodata:
+                                    #transform to numeric
+                                    value_f = float(value)
+                                    
+                                    date = dates[col]
 
-                                data = {
-                                    "datatype": datatype,
-                                    "fill": fill,
-                                    "period": period,
-                                    "station_id": station_id,
-                                    "date": date,
-                                    "value": value_f
-                                }
+                                    data = {
+                                        "datatype": datatype,
+                                        "fill": fill,
+                                        "period": period,
+                                        "station_id": station_id,
+                                        "date": date,
+                                        "value": value_f
+                                    }
 
-                                #set up non-required props
-                                for prop_key, prop_value in additional_props.items():
-                                    data[prop_key] = prop_value
+                                    #set up non-required props
+                                    for prop_key, prop_value in additional_props.items():
+                                        data[prop_key] = prop_value
 
-                                doc = {
-                                    "name": doc_name,
-                                    "value": data
-                                }
-                                duplicate_data = tapis_handler.check_duplicate(doc, key_fields)
-                                #if not a duplicate create doc
-                                if not duplicate_data["is_duplicate"]:
+                                    doc = {
+                                        "name": doc_name,
+                                        "value": data
+                                    }
                                     docs.append(doc)
-                                #otherwide if duplicates should be replaced and it is different than the old document, delete the old document and create
-                                elif replace_duplicates and duplicate_data["changed"]:
-                                    delete.append(duplicate_data["duplicate_uuid"])
-                                    docs.append(doc)
-
-            fd.close()
-            print(f"Deleting {len(delete)} duplicate documents")
-            if(len(delete) > 0):
-                tapis_handler.bulkDelete(delete)
-            print(f"Creating {len(docs)} new documents")
-            for doc in docs:
-                tapis_handler.create(doc)
+            finally:
+                if fd is not None:
+                    fd.close()
+            stats = tapis_handler.create_docs(docs, key_fields, replace_duplicates)
+            print(f"Completed processing {file}. Created: {stats["created"]}, Replaced: {stats["replaced"]}")
 
 state_data["complete"] = True
 write_state(state_data, state_file)
