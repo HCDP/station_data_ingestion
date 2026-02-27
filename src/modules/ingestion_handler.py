@@ -4,9 +4,10 @@ from time import sleep
 import requests
 import json
 import random
-from enum import Enum
 import urllib3
 import os
+from datetime import timedelta
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from tapipy.tapis import Tapis
 
@@ -280,9 +281,14 @@ class V3Handler:
         )
 
         # Generate an Access Token that will be used for all API calls
-        self.__client.get_tokens()
+        self.__check_auth()
         
 
+    def __check_auth(self):
+        # if no access token or expires in less than 5 minutes reauth
+        if self.__client.access_token is None or self.__client.access_token.expires_in() < timedelta(minutes = 5):
+            self.__client.get_tokens()
+    
 
     def __get_backoff(self, delay):
         backoff = 0
@@ -296,6 +302,8 @@ class V3Handler:
 
 
     def __handle_retry(self, method, retries = None, delay = 0, ignore_exceptions = (), **kwargs):
+        # Check if client token about to expire and reaut if necessary
+        self.__check_auth()
         if delay > 0:
             sleep(delay)
         if retries is None:
