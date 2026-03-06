@@ -230,7 +230,7 @@ for data_item in data:
                 if fd is not None:
                     fd.close()
             stats = tapis_handler.create_docs(docs, key_fields, replace_duplicates)
-            print(f"Completed processing {file}. Created: {stats["created"]}, Replaced: {stats["replaced"]}")
+            print(f"Completed processing {file}. Created: {stats['created']}, Replaced: {stats['replaced']}")
 
 state_data["complete"] = True
 write_state(state_data, state_file)
