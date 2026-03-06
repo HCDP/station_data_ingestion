@@ -273,10 +273,10 @@ class V3Handler:
 
         # Create python Tapis client for user
         self.__client = Tapis(
-            base_url = base_url, 
+            base_url = base_url,
             username = username,
-            password = password, 
-            account_type = "user", 
+            password = password,
+            account_type = "user",
             tenant_id = tenant
         )
 
@@ -345,7 +345,7 @@ class V3Handler:
         if db is None:
             db = self.__db
         if collection is None:
-            db = self.__collection
+            collection = self.__collection
             
         res = self.__handle_retry(self.__client.meta.listDocuments, db = db, collection = collection, docId = uuid)
         return res
@@ -360,7 +360,7 @@ class V3Handler:
         if db is None:
             db = self.__db
         if collection is None:
-            db = self.__collection
+            collection = self.__collection
             
         query = json.dumps(data)
         res = self.__handle_retry(self.__client.meta.listDocuments, db = db, collection = collection, page = offset + 1, pagesize = limit, filter = query)
@@ -371,7 +371,7 @@ class V3Handler:
         if db is None:
             db = self.__db
         if collection is None:
-            db = self.__collection
+            collection = self.__collection
             
         if len(data) > 1:
             self.__create(data, db, collection)
@@ -383,7 +383,7 @@ class V3Handler:
         if db is None:
             db = self.__db
         if collection is None:
-            db = self.__collection
+            collection = self.__collection
             
         replace_docs = {}
         create_docs = []
