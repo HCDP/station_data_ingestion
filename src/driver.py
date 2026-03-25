@@ -7,6 +7,7 @@ import sys
 from traceback import print_exception
 import requests
 from os.path import isfile
+from time import perf_counter
 
 from modules.ingestion_handler import V3Handler
 from modules.date_parser import DateParser, isoToDate
@@ -142,6 +143,16 @@ for data_item in data:
         raise Exception("Invalid date range")
 
     for i in range(len(files)):
+        
+        ################################
+        ########### profiler ###########
+        ################################
+        start_time = perf_counter()
+        
+        ################################
+        ################################
+        ################################
+        
         state_data["file"] = i
         #if file listed in state data is after this one skip
         if i >= state_data["file"]:
@@ -229,7 +240,44 @@ for data_item in data:
             finally:
                 if fd is not None:
                     fd.close()
+                    
+            ################################
+            ########### profiler ###########
+            ################################
+            
+            end_time = perf_counter()
+            print(f"Completed parsing file {file}: Elapsed time: {end_time - start_time:.6f} seconds")
+            
+            ################################
+            ################################
+            ################################
+            
+            
+            ################################
+            ########### profiler ###########
+            ################################
+            
+            start_time = perf_counter()
+            print(f"Creating Tapis documents")
+            
+            ################################
+            ################################
+            ################################
+            
+            
             stats = tapis_handler.create_docs(docs, key_fields, replace_duplicates)
+            
+            ################################
+            ########### profiler ###########
+            ################################
+            
+            end_time = perf_counter()
+            print(f"Completed creating Tapis documents: Elapsed time: {end_time - start_time:.6f} seconds")
+            
+            ################################
+            ################################
+            ################################
+            
             print(f"Completed processing {file}. Created: {stats['created']}, Replaced: {stats['replaced']}")
 
 state_data["complete"] = True

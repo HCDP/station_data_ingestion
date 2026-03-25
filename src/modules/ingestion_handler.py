@@ -7,6 +7,7 @@ import random
 import urllib3
 import os
 from datetime import timedelta
+from time import perf_counter
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from tapipy.tapis import Tapis
@@ -380,6 +381,20 @@ class V3Handler:
 
 
     def create_docs(self, data, key_fields, replace = True, db = None, collection = None):
+        
+        ################################
+        ########### profiler ###########
+        ################################
+        
+        start_time = perf_counter()
+        print(f"Querying duplicate documents")
+        
+        ################################
+        ################################
+        ################################
+        
+        
+        
         if db is None:
             db = self.__db
         if collection is None:
@@ -404,19 +419,85 @@ class V3Handler:
                 replace_docs[uuid] = doc
             elif len(matches) == 0:
                 create_docs.append(doc)
+                
+                
+
+        ################################
+        ########### profiler ###########
+        ################################
+        
+        end_time = perf_counter()
+        print(f"Completed querying duplicate documents: Elapsed time: {end_time - start_time:.6f} seconds")
+        
+        ################################
+        ################################
+        ################################
+                
         
         replaced = 0
         created = 0
+        
+        ################################
+        ########### profiler ###########
+        ################################
+        
+        start_time = perf_counter()
+        print(f"Replacing {len(replace_docs)} documents")
+        
+        ################################
+        ################################
+        ################################
+        
+        
         for uuid in replace_docs:
             new_doc = replace_docs[uuid]
             self.__replace(uuid, new_doc, db, collection)
             replaced += 1
+            
+        
+        ################################
+        ########### profiler ###########
+        ################################
+        
+        end_time = perf_counter()
+        print(f"Completed replacing duplicate documents: Elapsed time: {end_time - start_time:.6f} seconds")
+        
+        ################################
+        ################################
+        ################################
+        
+        
+        ################################
+        ########### profiler ###########
+        ################################
+        
+        start_time = perf_counter()
+        print(f"Creating {len(self.create_docs)} documents")
+        
+        ################################
+        ################################
+        ################################
+            
         if len(create_docs) > 1:
             self.__create(create_docs, db, collection)
             created += len(create_docs)
         elif len(create_docs) > 0:
             self.__create(create_docs[0], db, collection)
             created += 1
+            
+
+        ################################
+        ########### profiler ###########
+        ################################
+        
+        end_time = perf_counter()
+        print(f"Completed creating documents: Elapsed time: {end_time - start_time:.6f} seconds")
+        
+        ################################
+        ################################
+        ################################
+        
+            
         return {
             "replaced": replaced,
             "created":  created
