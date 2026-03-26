@@ -273,6 +273,7 @@ class V3Handler:
         self.__db = config.get("db") or os.getenv("TAPIS_V3_DB")
         self.__collection = config.get("collection") or os.getenv("TAPIS_V3_COLLECTION")
         concurrency = config.get("concurrency") or int(os.getenv("TAPIS_V3_CONCURRENCY")) or 1
+        print(concurrency)
         self.__semaphore = asyncio.Semaphore(concurrency)
 
         # Create python Tapis client for user
