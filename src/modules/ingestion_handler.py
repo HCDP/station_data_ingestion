@@ -8,6 +8,7 @@ import urllib3
 import os
 from datetime import timedelta
 from time import perf_counter
+import asyncio
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from tapipy.tapis import Tapis
@@ -271,6 +272,8 @@ class V3Handler:
         password = config.get("password") or os.getenv("TAPIS_V3_PASSWORD")
         self.__db = config.get("db") or os.getenv("TAPIS_V3_DB")
         self.__collection = config.get("collection") or os.getenv("TAPIS_V3_COLLECTION")
+        concurrency = config.get("concurrency") or int(os.getenv("TAPIS_V3_CONCURRENCY")) or 1
+        self.__semaphore = asyncio.Semaphore(concurrency)
 
         # Create python Tapis client for user
         self.__client = Tapis(
@@ -380,29 +383,10 @@ class V3Handler:
             self.__create(data[0], db, collection)
 
 
-    def create_docs(self, data, key_fields, replace = True, db = None, collection = None):
-        
-        ################################
-        ########### profiler ###########
-        ################################
-        
-        start_time = perf_counter()
-        print(f"Querying duplicate documents")
-        
-        ################################
-        ################################
-        ################################
-        
-        
-        
-        if db is None:
-            db = self.__db
-        if collection is None:
-            collection = self.__collection
-            
-        replace_docs = {}
-        create_docs = []
-        for doc in data:
+    async def __check_duplicate(self, doc, key_fields, replace, db, collection, semaphore):
+        uuid = None,
+        action = None
+        async with semaphore: 
             key_data = {
                 "name": doc["name"],
             }
@@ -416,10 +400,43 @@ class V3Handler:
             # Flag to replace if there is a single match, the replace flag is set, and the current value does not match the new value
             elif len(matches) > 0 and replace and matches[0]["value"] != doc["value"]:
                 uuid = matches[0]["_id"]["$oid"]
-                replace_docs[uuid] = doc
+                action = "replace"
             elif len(matches) == 0:
+                action = "create"
+        return (doc, uuid, action)
+    
+
+    async def create_docs(self, data, key_fields, replace = True, db = None, collection = None):
+        
+        ################################
+        ########### profiler ###########
+        ################################
+        
+        start_time = perf_counter()
+        print(f"Querying duplicate documents")
+        
+        ################################
+        ################################
+        ################################
+        
+        
+        if db is None:
+            db = self.__db
+        if collection is None:
+            collection = self.__collection
+            
+        replace_docs = {}
+        create_docs = []
+        
+        
+        tasks = [self.__check_duplicate(doc, key_fields, replace, db, collection, self.__semaphore) for doc in data]
+        duplicate_data = await asyncio.gather(*tasks)
+        
+        for doc, uuid, action in duplicate_data:
+            if action == "replace":
+                replace_docs[uuid] = doc
+            elif action == "create":
                 create_docs.append(doc)
-                
                 
 
         ################################
