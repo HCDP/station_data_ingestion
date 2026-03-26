@@ -472,7 +472,7 @@ class V3Handler:
         ################################
         
         start_time = perf_counter()
-        print(f"Creating {len(self.create_docs)} documents")
+        print(f"Creating {len(create_docs)} documents")
         
         ################################
         ################################
