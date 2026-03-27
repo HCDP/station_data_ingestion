@@ -264,17 +264,25 @@ class V2Handler:
 
 
 class V3Handler:
-    def __init__(self, config = {}):
-        self.__retries = config.get("retries") or int(os.getenv("TAPIS_V3_RETRIES"))
+    def __init__(self, config = None):
+        if config is None:
+            config = {}
+        self.__retries = config.get("retries") or int(os.getenv("TAPIS_V3_RETRIES", 3))
         tenant = config.get("tenant") or os.getenv("TAPIS_V3_TENANT")
         base_url = config.get("url") or os.getenv("TAPIS_V3_URL")
         username = config.get("username") or os.getenv("TAPIS_V3_USERNAME")
         password = config.get("password") or os.getenv("TAPIS_V3_PASSWORD")
         self.__db = config.get("db") or os.getenv("TAPIS_V3_DB")
         self.__collection = config.get("collection") or os.getenv("TAPIS_V3_COLLECTION")
-        concurrency = config.get("concurrency") or int(os.getenv("TAPIS_V3_CONCURRENCY")) or 1
-        print(concurrency)
-        self.__semaphore = asyncio.Semaphore(concurrency)
+        concurrency = config.get("concurrency") or int(os.getenv("TAPIS_V3_CONCURRENCY", 1))
+        self.__concurrency_sem = asyncio.Semaphore(concurrency)
+        self.__auth_lock = asyncio.Lock()
+        self.__auth_complete_event = asyncio.Event()
+        self.__auth_complete_event.set()
+        self.__outbound_tapis_calls_drained_event = asyncio.Event()
+        self.__outbound_tapis_calls_drained_event.set()
+        self.__outbound_tapis_calls_check_lock = asyncio.Lock()
+        self.__outbound_tapis_calls = 0
 
         # Create python Tapis client for user
         self.__client = Tapis(
@@ -286,13 +294,26 @@ class V3Handler:
         )
 
         # Generate an Access Token that will be used for all API calls
-        self.__check_auth()
+        self.__client.get_tokens()
         
 
-    def __check_auth(self):
-        # if no access token or expires in less than 5 minutes reauth
+    async def __check_auth(self):
+        # If no access token or expires in less than 5 minutes reauth
         if self.__client.access_token is None or self.__client.access_token.expires_in() < timedelta(minutes = 5):
-            self.__client.get_tokens()
+            # Acquire auth lock
+            async with self.__auth_lock:
+                # check if another task already completed the auth procedure
+                if self.__client.access_token is None or self.__client.access_token.expires_in() < timedelta(minutes = 5):
+                    # Clear auth complete event to prevent any more tasks from kicking off
+                    self.__auth_complete_event.clear()
+                    # Wait for all outbound tasks to complete
+                    await self.__outbound_tapis_calls_drained_event.wait()
+                    try:
+                        # Auth in background
+                        await asyncio.to_thread(self.__client.get_tokens)
+                    finally:
+                        # Set auth complete
+                        self.__auth_complete_event.set()
     
 
     def __get_backoff(self, delay):
@@ -306,15 +327,38 @@ class V3Handler:
         return backoff
 
 
-    def __handle_retry(self, method, retries = None, delay = 0, ignore_exceptions = (), **kwargs):
-        # Check if client token about to expire and reaut if necessary
-        self.__check_auth()
+    async def __execute_retry_method(self, method, **kwargs):
+        # Execute with a maximum concurrency as configured
+        async with self.__concurrency_sem:
+            # Wait for auth to complete is running
+            await self.__auth_complete_event.wait()
+            res = None
+            # Ensure counter and event checking steps do not have a race condition
+            async with self.__outbound_tapis_calls_check_lock:
+                # Add to outbound tapis calls count
+                self.__outbound_tapis_calls += 1
+                # Outbound calls are not drained
+                self.__outbound_tapis_calls_drained_event.clear()
+            try:
+                res = await asyncio.to_thread(method, **kwargs)
+            finally:
+                # Ensure counter and event checking steps do not have a race condition
+                async with self.__outbound_tapis_calls_check_lock:
+                    self.__outbound_tapis_calls -= 1
+                    if self.__outbound_tapis_calls < 1:
+                        self.__outbound_tapis_calls_drained_event.set()
+            return res
+        
+
+    async def __handle_retry(self, method, retries = None, delay = 0, ignore_exceptions = (), **kwargs):
+        # Check if client token about to expire and reauth if necessary
+        await self.__check_auth()
         if delay > 0:
-            sleep(delay)
+            await asyncio.sleep(delay)
         if retries is None:
             retries = self.__retries
         try:
-            data = method(**kwargs)
+            data = await self.__execute_retry_method(method, **kwargs)
             if isinstance(data, bytes):
                 data = json.loads(data.decode('utf-8'))
             return data
@@ -322,9 +366,9 @@ class V3Handler:
             if type(e) in ignore_exceptions or retries < 1:
                 raise e
             else:
-                return self.__handle_retry(method, retries = retries - 1, delay = self.__get_backoff(delay), ignore_exceptions = ignore_exceptions, **kwargs)
+                return await self.__handle_retry(method, retries = retries - 1, delay = self.__get_backoff(delay), ignore_exceptions = ignore_exceptions, **kwargs)
             
-    def __create(self, data, db, collection):
+    async def __create(self, data, db, collection):
         if isinstance(data, list):
             # Bulk ingest up to 500 docs at a time
             chunk_size = 500
@@ -336,27 +380,27 @@ class V3Handler:
                 if end > len(data):
                     end = len(data)
                 chunk = data[start : end]
-                self.__handle_retry(self.__client.meta.createDocument, db = db, collection = collection, request_body = chunk)
+                await self.__handle_retry(self.__client.meta.createDocument, db = db, collection = collection, request_body = chunk)
         else:
-            self.__handle_retry(self.__client.meta.createDocument, db = db, collection = collection, request_body = data)
+            await self.__handle_retry(self.__client.meta.createDocument, db = db, collection = collection, request_body = data)
 
 
 
-    def __replace(self, uuid, data, db, collection):
-        self.__handle_retry(self.__client.meta.replaceDocument, db = db, collection = collection, docId = uuid, request_body = data)
+    async def __replace(self, uuid, data, db, collection):
+        await self.__handle_retry(self.__client.meta.replaceDocument, db = db, collection = collection, docId = uuid, request_body = data)
             
     
-    def get_uuid(self, uuid, db = None, collection = None):
+    async def get_uuid(self, uuid, db = None, collection = None):
         if db is None:
             db = self.__db
         if collection is None:
             collection = self.__collection
             
-        res = self.__handle_retry(self.__client.meta.listDocuments, db = db, collection = collection, docId = uuid)
+        res = await self.__handle_retry(self.__client.meta.listDocuments, db = db, collection = collection, docId = uuid)
         return res
             
     
-    def query_data(self, data, limit = None, offset = None, db = None, collection = None):
+    async def query_data(self, data, limit = None, offset = None, db = None, collection = None):
         if limit is None:
             limit = 1000
         if offset is None:
@@ -368,42 +412,42 @@ class V3Handler:
             collection = self.__collection
             
         query = json.dumps(data)
-        res = self.__handle_retry(self.__client.meta.listDocuments, db = db, collection = collection, page = offset + 1, pagesize = limit, filter = query)
+        res = await self.__handle_retry(self.__client.meta.listDocuments, db = db, collection = collection, page = offset + 1, pagesize = limit, filter = query)
         return res
      
 
-    def create_docs_unsafe(self, data, db = None, collection = None):
+    async def create_docs_unsafe(self, data, db = None, collection = None):
         if db is None:
             db = self.__db
         if collection is None:
             collection = self.__collection
             
         if len(data) > 1:
-            self.__create(data, db, collection)
+            await self.__create(data, db, collection)
         elif len(data) > 0:
-            self.__create(data[0], db, collection)
+            await self.__create(data[0], db, collection)
 
 
-    async def __check_duplicate(self, doc, key_fields, replace, db, collection, semaphore):
-        uuid = None,
+    async def __check_duplicate(self, doc, key_fields, replace, db, collection):
+        uuid = None
         action = None
-        async with semaphore: 
-            key_data = {
-                "name": doc["name"],
-            }
-            for field in key_fields:
-                key = f"value.{field}"
-                key_data[key] = doc["value"][field]
-            matches = self.query_data(key_data, db = db, collection = collection)
-            # Throw an error if multiple docs match the key
-            if len(matches) > 1:
-                raise RecordKeyException("Multiple entries match the specified key data")
-            # Flag to replace if there is a single match, the replace flag is set, and the current value does not match the new value
-            elif len(matches) > 0 and replace and matches[0]["value"] != doc["value"]:
-                uuid = matches[0]["_id"]["$oid"]
-                action = "replace"
-            elif len(matches) == 0:
-                action = "create"
+
+        key_data = {
+            "name": doc["name"],
+        }
+        for field in key_fields:
+            key = f"value.{field}"
+            key_data[key] = doc["value"][field]
+        matches = await self.query_data(key_data, db = db, collection = collection)
+        # Throw an error if multiple docs match the key
+        if len(matches) > 1:
+            raise RecordKeyException("Multiple entries match the specified key data")
+        # Flag to replace if there is a single match, the replace flag is set, and the current value does not match the new value
+        elif len(matches) > 0 and replace and matches[0]["value"] != doc["value"]:
+            uuid = matches[0]["_id"]["$oid"]
+            action = "replace"
+        elif len(matches) == 0:
+            action = "create"
         return (doc, uuid, action)
     
 
@@ -430,7 +474,7 @@ class V3Handler:
         create_docs = []
         
         
-        tasks = [self.__check_duplicate(doc, key_fields, replace, db, collection, self.__semaphore) for doc in data]
+        tasks = [self.__check_duplicate(doc, key_fields, replace, db, collection) for doc in data]
         duplicate_data = await asyncio.gather(*tasks)
         
         for doc, uuid, action in duplicate_data:
@@ -452,8 +496,6 @@ class V3Handler:
         ################################
                 
         
-        replaced = 0
-        created = 0
         
         ################################
         ########### profiler ###########
@@ -466,11 +508,8 @@ class V3Handler:
         ################################
         ################################
         
-        
-        for uuid in replace_docs:
-            new_doc = replace_docs[uuid]
-            self.__replace(uuid, new_doc, db, collection)
-            replaced += 1
+        tasks = [self.__replace(uuid, replace_docs[uuid], db, collection) for uuid in replace_docs]
+        await asyncio.gather(*tasks)
             
         
         ################################
@@ -497,11 +536,9 @@ class V3Handler:
         ################################
             
         if len(create_docs) > 1:
-            self.__create(create_docs, db, collection)
-            created += len(create_docs)
+            await self.__create(create_docs, db, collection)
         elif len(create_docs) > 0:
-            self.__create(create_docs[0], db, collection)
-            created += 1
+            await self.__create(create_docs[0], db, collection)
             
 
         ################################
@@ -517,11 +554,7 @@ class V3Handler:
         
             
         return {
-            "replaced": replaced,
-            "created":  created
+            "replaced": len(replace_docs),
+            "created":  len(create_docs)
         }
         
-            
-
-    
-    

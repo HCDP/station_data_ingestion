@@ -24,8 +24,6 @@ def get_state(state_file):
     #note row and column indices are to data rows/columns (does not include header row or metadata columns, cols should be offset from data col start and row should start at row 1)
     state_data = {
         "file": 0,
-        "row": 0,
-        "col": 0,
         "complete": False
     }
     #if state file not provided return default, won't be written
@@ -152,7 +150,6 @@ async def main():
             ################################
             ################################
             
-            state_data["file"] = i
             #if file listed in state data is after this one skip
             if i >= state_data["file"]:
                 docs = []
@@ -162,6 +159,7 @@ async def main():
                 is_local_file = isfile(file)
                 
                 fd = None
+                res = None
                 try:
                     #if local file open and assign fd to file ref
                     if is_local_file:
@@ -201,43 +199,42 @@ async def main():
                                     
                     # process data rows
                     for row in reader:
-                        #if empty line or before the row indicated in the state object, skip
-                        if len(row) > 0 and row_num >= state_data["row"]:
-                            station_id = row[id_col]
-                            #cut values to data range
-                            values = row[range_start:range_end]
-                            for col in range(len(values)):
-                                #if before the column indicated in the state object, skip
-                                if col >= state_data["col"]:
-                                    value = values[col]
-                                    #if value is nodata skip
-                                    if value != nodata:
-                                        #transform to numeric
-                                        value_f = float(value)
-                                        
-                                        date = dates[col]
+                        station_id = row[id_col]
+                        #cut values to data range
+                        values = row[range_start:range_end]
+                        for col in range(len(values)):
+                            value = values[col]
+                            #if value is nodata skip
+                            if value != nodata:
+                                #transform to numeric
+                                value_f = float(value)
+                                
+                                date = dates[col]
 
-                                        data = {
-                                            "datatype": datatype,
-                                            "fill": fill,
-                                            "period": period,
-                                            "station_id": station_id,
-                                            "date": date,
-                                            "value": value_f
-                                        }
+                                data = {
+                                    "datatype": datatype,
+                                    "fill": fill,
+                                    "period": period,
+                                    "station_id": station_id,
+                                    "date": date,
+                                    "value": value_f
+                                }
 
-                                        #set up non-required props
-                                        for prop_key, prop_value in additional_props.items():
-                                            data[prop_key] = prop_value
+                                #set up non-required props
+                                for prop_key, prop_value in additional_props.items():
+                                    data[prop_key] = prop_value
 
-                                        doc = {
-                                            "name": doc_name,
-                                            "value": data
-                                        }
-                                        docs.append(doc)
+                                doc = {
+                                    "name": doc_name,
+                                    "value": data
+                                }
+                                docs.append(doc)
+                        row_num +=1
                 finally:
-                    if fd is not None:
+                    if is_local_file and fd is not None:
                         fd.close()
+                    elif not is_local_file and res is not None:
+                        res.close()
                         
                 ################################
                 ########### profiler ###########
@@ -277,6 +274,9 @@ async def main():
                 ################################
                 
                 print(f"Completed processing {file}. Created: {stats['created']}, Replaced: {stats['replaced']}")
+                
+                state_data["file"] = i + 1
+                write_state(state_data, state_file)
 
     state_data["complete"] = True
     write_state(state_data, state_file)
