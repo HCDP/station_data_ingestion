@@ -199,6 +199,9 @@ async def main():
                                     
                     # process data rows
                     for row in reader:
+                        # guard against empty rows or stubs
+                        if not row or len(row) <= range_start:
+                            continue
                         station_id = row[id_col]
                         #cut values to data range
                         values = row[range_start:range_end]
