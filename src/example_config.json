@@ -1,10 +1,13 @@
 {
-    "tapis_config": {
-        "tenant_url": "https://agaveauth.its.hawaii.edu/meta/v2/data",
-        "hcdp_api_url": "https://api.hcdp.ikewai.org",
-        "agave_token": "token",
-        "hcdp_api_token": "token",
-        "retry": 3
+    "tapisV3_config": {
+        "retries": 3,
+        "tenant": "uhprod",
+        "url": "https://uhprod.uhtapis.org",
+        "username": "username",
+        "password": "password",
+        "db": "hcdp",
+        "collection": "hawaii_stations",
+        "concurrency": 4
     },
     "data": [
         {
