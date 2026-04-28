@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -euo pipefail
+
 echo "[task.sh] Starting Execution."
 cd /home/hcdp_tapis_ingestor
 
@@ -9,6 +12,6 @@ echo "[task.sh] [2/3] Updating date strings in config"
 python3 /actor/update_date_string_in_config.py config_temp.json config.json $CUSTOM_DATE
 
 echo "[task.sh] [3/3] Ingesting station values."
-python3 driver.py config.json
+python3 -u driver.py config.json
 
 echo "[task.sh] All done!"
