@@ -6,6 +6,8 @@ LABEL org.opencontainers.image.description="Ingestion container for station valu
 RUN apt update
 RUN apt install -y curl
 
+RUN pip install pandas
+
 RUN mkdir -p /home/hcdp_tapis_ingestor
 RUN mkdir /actor
 
