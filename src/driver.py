@@ -138,7 +138,7 @@ def main():
             print(f"Processing file {file}")
             
             # will handle local files or URLs
-            df = pd.read_csv(file, keep_default_na = False)
+            df = pd.read_csv(file, keep_default_na = False, dtype = { "SKN": str })
             metadata, values = filter_cols(df, period, start_date, end_date)
             
             # if should write metadata handle metadata
@@ -148,25 +148,24 @@ def main():
                 print(metadata)
                 metadata_docs = metadata.to_dict(orient = "records")
                 # cleanup nodata values in metadata
-                metadata_docs = [{k: v for k, v in doc.items() if v != nodata} for doc in metadata_docs]
-                
+                metadata_docs = [{k: v for k, v in doc.items() if v != nodata} for doc in metadata_docs]                
                 stats = write_to_hcdp_api("metadata", location, metadata_docs, [], replace_duplicates)
                 print(f"Completed writing metadata for {file}. Created {stats['created']}, Replaced {stats['replaced']}")
             
             # process values
             values = values.melt(
-                id_vars = ['skn'], 
-                var_name = 'date', 
-                value_name = 'value'
+                id_vars = ["skn"], 
+                var_name = "date", 
+                value_name = "value"
             )
-            values = values.rename(columns = {'skn': 'station_id'})
-            values = values[values['value'] != nodata]
+            values = values.rename(columns = {"skn": "station_id"})
+            values = values[values["value"] != nodata]
+            values["value"] = pd.to_numeric(values["value"])
                         
             for key, value in static_properties.items():
                 values[key] = value
             print(values)
             value_docs = values.to_dict(orient = "records")
-            
             stats = write_to_hcdp_api("value", location, value_docs, additional_key_props, replace_duplicates)
             print(f"Completed writing values for {file}. Created {stats['created']}, Replaced {stats['replaced']}")
 
